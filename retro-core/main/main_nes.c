@@ -256,6 +256,7 @@ void nes_main(void)
     }
 
     rg_system_set_tick_rate(nes->refresh_rate);
+    app->frameskip = 0;
 
     int skipFrames = 0;
 

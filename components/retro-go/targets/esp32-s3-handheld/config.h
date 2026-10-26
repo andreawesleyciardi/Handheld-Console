@@ -12,7 +12,7 @@
 
 #define RG_SCREEN_DRIVER            2
 #define RG_SCREEN_HOST             SPI2_HOST
-#define RG_SCREEN_SPEED            10000000
+#define RG_SCREEN_SPEED            40000000
 #define RG_SCREEN_BACKLIGHT        0
 #define RG_SCREEN_WIDTH             480
 #define RG_SCREEN_HEIGHT            320
@@ -45,6 +45,10 @@
     {RG_KEY_DOWN,   .num = GPIO_NUM_42, .pullup = 1, .level = 0},\
     {RG_KEY_RIGHT,  .num = GPIO_NUM_41, .pullup = 1, .level = 0},\
     {RG_KEY_LEFT,   .num = GPIO_NUM_40, .pullup = 1, .level = 0},\
+}
+
+#define RG_GAMEPAD_VIRT_MAP {\
+    {RG_KEY_MENU,   .src = RG_KEY_START | RG_KEY_SELECT},\
 }
 
 #define RG_BATTERY_DRIVER          1

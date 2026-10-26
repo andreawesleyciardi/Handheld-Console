@@ -17,10 +17,10 @@ static const keymap_t KEYMAPS[] = {
 	{"Type A", {
 		{SNES_A_MASK, RG_KEY_A, 0},
 		{SNES_B_MASK, RG_KEY_B, 0},
-		{SNES_X_MASK, RG_KEY_START, 0},
-		{SNES_Y_MASK, RG_KEY_SELECT, 0},
-		{SNES_TL_MASK, RG_KEY_B, RG_KEY_MENU},
-		{SNES_TR_MASK, RG_KEY_A, RG_KEY_MENU},
+        {SNES_X_MASK, RG_KEY_X, 0},
+        {SNES_Y_MASK, RG_KEY_Y, 0},
+        {SNES_TL_MASK, RG_KEY_L, 0},
+        {SNES_TR_MASK, RG_KEY_R, 0},
 		{SNES_START_MASK, RG_KEY_START, RG_KEY_MENU},
 		{SNES_SELECT_MASK, RG_KEY_SELECT, RG_KEY_MENU},
 		{SNES_UP_MASK, RG_KEY_UP, 0},
@@ -308,6 +308,8 @@ void snes_main(void)
 
     updates[0] = rg_surface_create(SNES_WIDTH, SNES_HEIGHT_EXTENDED, RG_PIXEL_565_LE, 0);
     updates[0]->height = SNES_HEIGHT;
+    updates[1] = rg_surface_create(SNES_WIDTH, SNES_HEIGHT_EXTENDED, RG_PIXEL_565_LE, 0);
+    updates[1]->height = SNES_HEIGHT;
     currentUpdate = updates[0];
 
     audioBuffer = (rg_audio_sample_t *)malloc(AUDIO_BUFFER_LENGTH * 4);
@@ -364,7 +366,7 @@ void snes_main(void)
     }
 
     rg_system_set_tick_rate(Memory.ROMFramesPerSecond);
-    app->frameskip = 3;
+    app->frameskip = 0;
 
     bool menuCancelled = false;
     bool menuPressed = false;
@@ -379,12 +381,14 @@ void snes_main(void)
             if (!menuCancelled)
             {
                 rg_task_delay(50);
+                rg_display_sync(true);
                 rg_gui_game_menu();
             }
             menuCancelled = false;
         }
         else if (joystick & RG_KEY_OPTION)
         {
+            rg_display_sync(true);
             rg_gui_options_menu();
         }
 
@@ -400,6 +404,10 @@ void snes_main(void)
         bool slowFrame = false;
 
         IPPU.RenderThisFrame = drawFrame;
+        if (drawFrame)
+        {
+            currentUpdate = updates[currentUpdate == updates[0]];
+        }
         GFX.Screen = currentUpdate->data;
 
         S9xMainLoop();

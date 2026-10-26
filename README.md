@@ -138,6 +138,12 @@ project's [BUILDING.md](BUILDING.md) contains additional upstream build notes.
 - Mega Drive / Genesis via `gwenesis`
 - MSX via `fmsx`
 
+Game Boy games use the classic green DMG palette by default. For monochrome
+GB titles, open the emulator's Options menu and change Palette to Pocket,
+Light, or another available palette. GBC games use their cartridge color
+data. Game Boy Advance (`.gba`) games are not supported by this build because
+it does not include a GBA emulator.
+
 Neo Geo is not included in this build. Original Metal Slug games therefore
 cannot run without adding and integrating a separate arcade or Neo Geo core.
 

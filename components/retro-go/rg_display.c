@@ -176,7 +176,7 @@ static inline void write_update(const rg_surface_t *update)
                 }
                 if (format & RG_PIXEL_PALETTE)
                     RENDER_LINE(uint8_t, palette[buffer[x]])
-                else if (format == RG_PIXEL_565_LE)
+                else if (format == RG_PIXEL_565_BE)
                     RENDER_LINE(uint16_t, (buffer[x] << 8) | (buffer[x] >> 8))
                 else
                     RENDER_LINE(uint16_t, buffer[x])
