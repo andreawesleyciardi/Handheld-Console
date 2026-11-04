@@ -170,3 +170,7 @@ void gui_draw_status(tab_t *tab);
 void gui_draw_list(tab_t *tab);
 void gui_draw_tab_indicator(void);
 void gui_draw_preview(tab_t *tab);
+
+// Theme scripts (gui_script.c): calls the theme.lua function `hook` (eg: "draw_list").
+// Returns false when there's no such function, then the original gui_draw_* function must be used.
+bool gui_script_draw(const char *hook, tab_t *tab);

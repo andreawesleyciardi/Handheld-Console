@@ -8,7 +8,7 @@ CC="gcc"
 CFLAGS="-no-pie -DRG_TARGET_SDL2 -DRETRO_GO -DCJSON_HIDE_SYMBOLS -DSDL_MAIN_HANDLED=1 -DRG_BUILD_INFO=\"SDL2\" -Dapp_main=SDL_Main $(sdl2-config --cflags)"
 INCLUDES="-Icomponents/retro-go -Icomponents/retro-go/libs/cJSON -Icomponents/retro-go/libs/lodepng -Icomponents/retro-go/libs/miniz"
 SRCFILES="components/retro-go/*.c components/retro-go/drivers/audio/*.c components/retro-go/fonts/*.c
-		  components/retro-go/libs/cJSON/*.c components/retro-go/libs/lodepng/*.c components/retro-go/libs/miniz/*.c"
+		  components/retro-go/libs/cJSON/*.c components/retro-go/libs/lodepng/*.c components/retro-go/libs/miniz/*.c components/retro-go/libs/lua/*.c"
 LIBS="$(sdl2-config --libs) -lstdc++"
 
 echo "Cleaning..."

@@ -130,6 +130,50 @@ python3 rg_tool.py --target esp32-s3-handheld \
 Replace the serial port with the one assigned to the board by macOS. The
 project's [BUILDING.md](BUILDING.md) contains additional upstream build notes.
 
+## Desktop preview (macOS)
+
+The launcher and `retro-core` can run in a window on a Mac, with the same 480x320 screen and
+buttons as the handheld. It's useful for UI and theme work without the device.
+
+```sh
+brew install sdl2
+tools/build_sdl2_macos.sh            # build launcher + retro-core, then run
+tools/build_sdl2_macos.sh launcher   # rebuild only the launcher, then run (faster for UI work)
+tools/build_sdl2_macos.sh run        # run without rebuilding
+```
+
+| Device button | Key       |
+| ------------- | --------- |
+| D-pad         | Arrows    |
+| A / B         | X / Z     |
+| X / Y         | S / A     |
+| L / R         | Q / W     |
+| Start         | Space     |
+| Select        | Backspace |
+| Menu          | Space + Backspace (Start + Select, as on the device) |
+
+The emulated SD card is `./sd`. Put ROMs in `./sd/roms/<system>/`. `./sd/retro-go/themes`
+links to this repository's `themes/` folder. The selected theme reloads by itself when one of its files
+is saved, and Cmd+R (or F5) reloads it on demand (these developer keys are only in this desktop build). Logs
+are written to `stdout.txt`. Setting `RG_SDL_SNAPSHOT=/path/file.bmp` saves the emulated
+screen to that file whenever it changes. `RG_SDL_INPUT` plays back button presses for automated checks:
+`RG_SDL_INPUT="1000:a,1200:,2000:start+select,2300:"` presses A at 1 s, releases it at 1.2 s, and so on.
+
+The desktop target is
+[`targets/sdl2-handheld`](components/retro-go/targets/sdl2-handheld/config.h). It reads pixels
+in the same order as the device's ILI9488 driver, so the colors match what the device shows.
+DOOM, Mega Drive and MSX aren't available on desktop.
+
+## Themes
+
+Themes go in `/retro-go/themes/<name>/` on the SD card and are selected in Options → Theme. Besides
+images and colors (see [THEMING.md](THEMING.md)), a theme in this fork can include a `theme.lua` script
+that redraws the launcher and the menus with its own layout, without rebuilding the firmware. Themes
+can also bring their own font (`font.rgf`, made from a TTF with `tools/make_theme_font.py`) and use PNG
+transparency. The included [`midnight`](themes/midnight/) theme (adapted from the Recalbox theme by Benoit
+Bounar) is an example, and [`midnight-classic`](themes/midnight-classic/) is a simpler, fully drawn one.
+Copy the [`themes/`](themes/) folders to the SD card to install them.
+
 ## Included emulators
 
 - NES, SNES, Game Boy, Game Boy Color, Game & Watch, PC Engine, Lynx, SMS,

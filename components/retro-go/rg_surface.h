@@ -45,6 +45,8 @@ typedef struct
     void *data;
     bool free_data;
     bool free_palette;
+    uint8_t *alpha; // Optional opacity per pixel (0-255, width*height, no stride), only set for PNGs with transparency.
+                    // Owned by the surface. Only rg_gui_draw_image uses it, conversions/copies drop it.
 } rg_surface_t;
 
 // rg_image_t always contains a RG_PIXEL_565_LE surface

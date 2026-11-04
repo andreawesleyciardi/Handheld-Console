@@ -93,6 +93,9 @@ static rg_color_t ledColor = -1;
 static rg_stats_t statistics;
 static rg_app_t app;
 static rg_task_t tasks[8];
+#ifdef RG_TARGET_SDL2
+static SDL_threadID sdl2_main_thread;
+#endif
 
 static const char *SETTING_BOOT_NAME = "BootName";
 static const char *SETTING_BOOT_ARGS = "BootArgs";
@@ -367,6 +370,7 @@ static void platform_init(void)
     freopen("stdout.txt", "w", stdout);
     freopen("stderr.txt", "w", stderr);
     SDL_SetMainReady();
+    sdl2_main_thread = SDL_ThreadID();
     if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO) < 0)
         RG_PANIC("SDL Init failed!");
 #endif
@@ -625,10 +629,11 @@ bool rg_task_send(rg_task_t *task, const rg_task_msg_t *msg)
 #if defined(ESP_PLATFORM)
     return xQueueSend(task->queue, msg, portMAX_DELAY) == pdTRUE;
 #elif defined(RG_TARGET_SDL2)
-    while (task->msgWaiting > 0)
-        continue;
+    // Atomic accesses: plain reads get hoisted out of these loops by the optimizer (infinite loop at -O2)
+    while (__atomic_load_n(&task->msgWaiting, __ATOMIC_ACQUIRE) > 0)
+        SDL_Delay(0);
     task->msg = *msg;
-    task->msgWaiting = 1;
+    __atomic_store_n(&task->msgWaiting, 1, __ATOMIC_RELEASE);
     return true;
 #endif
 }
@@ -643,9 +648,10 @@ bool rg_task_peek(rg_task_msg_t *out)
 #if defined(ESP_PLATFORM)
     success = xQueuePeek(task->queue, out, portMAX_DELAY) == pdTRUE;
 #elif defined(RG_TARGET_SDL2)
-    while (task->msgWaiting < 1)
-        continue;
+    while (__atomic_load_n(&task->msgWaiting, __ATOMIC_ACQUIRE) < 1)
+        SDL_Delay(0);
     *out = task->msg;
+    success = true;
 #endif
     // task->blocked = false;
     return success;
@@ -661,10 +667,11 @@ bool rg_task_receive(rg_task_msg_t *out)
 #if defined(ESP_PLATFORM)
     success = xQueueReceive(task->queue, out, portMAX_DELAY) == pdTRUE;
 #elif defined(RG_TARGET_SDL2)
-    while (task->msgWaiting < 1)
-        continue;
+    while (__atomic_load_n(&task->msgWaiting, __ATOMIC_ACQUIRE) < 1)
+        SDL_Delay(0);
     *out = task->msg;
-    task->msgWaiting = 0;
+    __atomic_store_n(&task->msgWaiting, 0, __ATOMIC_RELEASE);
+    success = true;
 #endif
     // task->blocked = false;
     return success;
@@ -676,7 +683,7 @@ size_t rg_task_messages_waiting(rg_task_t *task)
 #if defined(ESP_PLATFORM)
     return uxQueueMessagesWaiting(task->queue);
 #elif defined(RG_TARGET_SDL2)
-    return task->msgWaiting;
+    return __atomic_load_n(&task->msgWaiting, __ATOMIC_ACQUIRE);
 #endif
 }
 
@@ -685,12 +692,63 @@ size_t rg_task_messages_waiting(rg_task_t *task)
 //     return task->blocked;
 // }
 
+#ifdef RG_TARGET_SDL2
+// macOS only allows window and event calls (SDL_PumpEvents, SDL_UpdateWindowSurface, ...) on the main
+// thread and aborts otherwise. Other threads skip pumping; the main thread pumps often enough.
+bool rg_system_sdl2_is_main_thread(void)
+{
+    return SDL_ThreadID() == sdl2_main_thread;
+}
+
+#ifdef RG_SDL_DEV_TOOLS
+static bool sdl2_reload_key_pressed;
+
+bool rg_system_sdl2_take_reload_key(void)
+{
+    bool pressed = sdl2_reload_key_pressed;
+    sdl2_reload_key_pressed = false;
+    return pressed;
+}
+#endif
+
+void rg_system_sdl2_pump(void)
+{
+    if (!rg_system_sdl2_is_main_thread())
+        return;
+    SDL_PumpEvents();
+#ifdef RG_SDL_DEV_TOOLS
+    // Developer builds: Cmd+R / Ctrl+R or F5 reloads the theme (handled by rg_gui_dev_reload_theme at a
+    // safe point). On Mac keyboards F5 is a media key (dictation) unless Fn is held, hence Cmd+R.
+    SDL_Event events[16];
+    int count = SDL_PeepEvents(events, RG_COUNT(events), SDL_PEEKEVENT, SDL_KEYDOWN, SDL_KEYDOWN);
+    for (int i = 0; i < count; i++)
+    {
+        const SDL_Keysym *key = &events[i].key.keysym;
+        if (events[i].key.repeat)
+            continue;
+        if (key->scancode == SDL_SCANCODE_F5 || (key->scancode == SDL_SCANCODE_R && (key->mod & (KMOD_GUI | KMOD_CTRL))))
+            sdl2_reload_key_pressed = true;
+    }
+#endif
+    // Retro-Go reads the keyboard state directly and never consumes events. Closing the window must
+    // quit, and the rest of the queue is dropped so it doesn't grow forever.
+    if (SDL_HasEvent(SDL_QUIT))
+    {
+        RG_LOGW("Window closed, exiting.");
+        fflush(stdout);
+        exit(0); // Exit code 0 also stops the run loop in tools/build_sdl2_macos.sh
+    }
+    SDL_FlushEvents(SDL_FIRSTEVENT, SDL_LASTEVENT);
+    rg_display_sdl2_present();
+}
+#endif
+
 void rg_task_delay(uint32_t ms)
 {
 #if defined(ESP_PLATFORM)
     vTaskDelay(pdMS_TO_TICKS(ms));
 #elif defined(RG_TARGET_SDL2)
-    SDL_PumpEvents();
+    rg_system_sdl2_pump();
     SDL_Delay(ms);
 #endif
 }
@@ -700,7 +758,7 @@ void rg_task_yield(void)
 #if defined(ESP_PLATFORM)
     vPortYield();
 #elif defined(RG_TARGET_SDL2)
-    SDL_PumpEvents();
+    rg_system_sdl2_pump();
 #endif
 }
 

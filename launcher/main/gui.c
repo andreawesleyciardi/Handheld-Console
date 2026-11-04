@@ -376,22 +376,34 @@ void gui_redraw(void)
     rg_gui_set_surface(gui.surface);
 
     tab_t *tab = gui_get_current_tab();
+    // Each step first asks the theme script (theme.lua) and falls back to the original function
     if (!tab)
     {
         RG_LOGW("No tab to redraw...");
     }
+    else if (gui_script_draw("draw_launcher", tab))
+    {
+        // The theme script drew the whole screen
+    }
     else if (gui.browse)
     {
-        gui_draw_background(tab, 4);
-        gui_draw_header(tab, 0);
-        gui_draw_status(tab);
-        gui_draw_list(tab);
-        gui_draw_preview(tab);
+        if (!gui_script_draw("draw_background", tab))
+            gui_draw_background(tab, 4);
+        if (!gui_script_draw("draw_header", tab))
+            gui_draw_header(tab, 0);
+        if (!gui_script_draw("draw_status", tab))
+            gui_draw_status(tab);
+        if (!gui_script_draw("draw_list", tab))
+            gui_draw_list(tab);
+        if (!gui_script_draw("draw_preview", tab))
+            gui_draw_preview(tab);
     }
     else
     {
-        gui_draw_background(tab, 0);
-        gui_draw_header(tab, (gui.height - HEADER_HEIGHT) / 2);
+        if (!gui_script_draw("draw_background", tab))
+            gui_draw_background(tab, 0);
+        if (!gui_script_draw("draw_header", tab))
+            gui_draw_header(tab, (gui.height - HEADER_HEIGHT) / 2);
         // gui_draw_tab_indicator();
     }
 

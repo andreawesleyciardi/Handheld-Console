@@ -235,6 +235,14 @@ void rg_system_log(int level, const char *context, const char *format, ...) __at
 bool rg_system_save_trace(const char *filename, bool append);
 void rg_system_event(int event, void *data);
 int64_t rg_system_timer(void);
+#ifdef RG_TARGET_SDL2
+bool rg_system_sdl2_is_main_thread(void);
+void rg_system_sdl2_pump(void);   // Process window events and present the screen (main thread only)
+void rg_display_sdl2_present(void); // Implemented by drivers/display/sdl2.h
+#ifdef RG_SDL_DEV_TOOLS
+bool rg_system_sdl2_take_reload_key(void); // True once after Cmd+R / Ctrl+R / F5 was pressed (developer builds only)
+#endif
+#endif
 rg_app_t *rg_system_get_app(void);
 // rg_config_t rg_system_get_config(void);
 rg_stats_t rg_system_get_stats(void);

@@ -38,6 +38,58 @@ static rg_keymap_serial_t keymap_serial[] = RG_GAMEPAD_SERIAL_MAP;
 #ifdef RG_GAMEPAD_VIRT_MAP
 static rg_keymap_virt_t keymap_virt[] = RG_GAMEPAD_VIRT_MAP;
 #endif
+#ifdef RG_TARGET_SDL2
+// Desktop testing aid: RG_SDL_INPUT="1500:a,1700:,3000:start+select,3300:" holds the given buttons from
+// each time (in ms since start) until the next entry. An empty entry releases everything.
+// Button names: up down left right a b x y l r start select menu option.
+static uint32_t sdl_scripted_input(void)
+{
+    static const struct {const char *name; uint32_t key;} names[] = {
+        {"up", RG_KEY_UP}, {"down", RG_KEY_DOWN}, {"left", RG_KEY_LEFT}, {"right", RG_KEY_RIGHT},
+        {"a", RG_KEY_A}, {"b", RG_KEY_B}, {"x", RG_KEY_X}, {"y", RG_KEY_Y}, {"l", RG_KEY_L}, {"r", RG_KEY_R},
+        {"start", RG_KEY_START}, {"select", RG_KEY_SELECT}, {"menu", RG_KEY_MENU}, {"option", RG_KEY_OPTION},
+    };
+    static const char *spec = NULL;
+    static int64_t start_time = -1;
+    if (start_time < 0)
+    {
+        spec = getenv("RG_SDL_INPUT");
+        start_time = rg_system_timer();
+    }
+    if (!spec || !spec[0])
+        return 0;
+
+    int64_t elapsed_ms = (rg_system_timer() - start_time) / 1000;
+    uint32_t state = 0;
+    const char *ptr = spec;
+    while (*ptr)
+    {
+        char *end;
+        long time_ms = strtol(ptr, &end, 10);
+        if (end == ptr || *end != ':' || time_ms > elapsed_ms)
+            break;
+        ptr = end + 1;
+        uint32_t keys = 0;
+        while (*ptr && *ptr != ',')
+        {
+            size_t len = strcspn(ptr, "+,");
+            for (size_t i = 0; i < RG_COUNT(names); ++i)
+            {
+                if (strlen(names[i].name) == len && strncmp(ptr, names[i].name, len) == 0)
+                    keys |= names[i].key;
+            }
+            ptr += len;
+            if (*ptr == '+')
+                ptr++;
+        }
+        state = keys;
+        if (*ptr == ',')
+            ptr++;
+    }
+    return state;
+}
+#endif
+
 static bool input_task_running = false;
 static uint32_t gamepad_state = -1; // _Atomic
 static uint32_t gamepad_mapped = 0;
@@ -172,6 +224,7 @@ bool rg_input_read_gamepad_raw(uint32_t *out)
         if (keys[mapping->src])
             state |= mapping->key;
     }
+    state |= sdl_scripted_input();
 #else
 #warning "not implemented"
 #endif
@@ -380,7 +433,7 @@ bool rg_input_key_is_present(rg_key_t mask)
 uint32_t rg_input_read_gamepad(void)
 {
 #ifdef RG_TARGET_SDL2
-    SDL_PumpEvents();
+    rg_system_sdl2_pump();
 #endif
     return gamepad_state;
 }

@@ -6,6 +6,8 @@
 #include "targets/retro-esp32/config.h"
 #elif defined(RG_TARGET_RETRO_RULER_V1)
 #include "targets/retro-ruler-V1/config.h"
+#elif defined(RG_TARGET_SDL2) && defined(RG_TARGET_SDL2_HANDHELD)
+#include "targets/sdl2-handheld/config.h"
 #elif defined(RG_TARGET_SDL2)
 #include "targets/sdl2/config.h"
 #elif defined(RG_TARGET_MRGC_GBM)

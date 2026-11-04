@@ -74,6 +74,7 @@ void rg_surface_free(rg_surface_t *surface)
         free(surface->data);
     if (surface->free_palette)
         free(surface->palette);
+    free(surface->alpha);
     free(surface);
 }
 
@@ -275,15 +276,36 @@ rg_surface_t *rg_surface_load_image(const uint8_t *data, size_t data_len, uint32
         unsigned error, width, height;
         uint8_t *image = NULL;
 
-        error = lodepng_decode24(&image, &width, &height, data, data_len);
+        // Decoded as RGBA so transparency is kept (see rg_surface_t.alpha), opaque PNGs end up as before
+        error = lodepng_decode32(&image, &width, &height, data, data_len);
         if (error)
         {
             RG_LOGE("PNG decoding failed: %d\n", error);
             return NULL;
         }
 
-        rg_surface_t png = {width, height, .stride = width * 3, .format = RG_PIXEL_888, .data = image};
-        rg_surface_t *img = rg_surface_convert(&png, 0, 0, RG_PIXEL_565_LE);
+        rg_surface_t *img = rg_surface_create(width, height, RG_PIXEL_565_LE, 0);
+        if (!img)
+        {
+            free(image);
+            return NULL;
+        }
+
+        size_t pixels = (size_t)width * height;
+        bool has_alpha = false;
+        uint16_t *dst = img->data;
+        for (size_t i = 0; i < pixels; ++i)
+        {
+            const uint8_t *p = image + i * 4;
+            dst[i] = ((p[0] >> 3) << 11) | ((p[1] >> 2) << 5) | (p[2] >> 3);
+            has_alpha |= p[3] != 255;
+        }
+
+        if (has_alpha && (img->alpha = malloc(pixels)))
+        {
+            for (size_t i = 0; i < pixels; ++i)
+                img->alpha[i] = image[i * 4 + 3];
+        }
 
         free(image);
         return img;

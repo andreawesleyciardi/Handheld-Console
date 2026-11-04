@@ -109,8 +109,13 @@ void rg_gui_update_geometry(void);
 bool rg_gui_set_language_id(int index);
 void rg_gui_set_surface(rg_surface_t *surface);
 bool rg_gui_set_font(int index);
+rg_font_t *rg_gui_load_font_file(const char *path); // .rgf font file (see THEMING.md), free() it when done
+void rg_gui_set_text_font(const rg_font_t *font);   // Draw text with this font until called with NULL
 bool rg_gui_set_theme(const char *name);
 const char *rg_gui_get_theme_name(void);
+// Desktop developer builds (RG_SDL_DEV_TOOLS): reloads the theme when Cmd+R or F5 is pressed or one of its
+// files changed, and returns true if it did. Always returns false on the device.
+bool rg_gui_dev_reload_theme(void);
 rg_image_t *rg_gui_get_theme_image(const char *name);
 rg_color_t rg_gui_get_theme_color(const char *section, const char *key, rg_color_t default_value);
 rg_margins_t rg_gui_get_safe_area(void);

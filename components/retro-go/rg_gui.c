@@ -1,5 +1,6 @@
 #include "rg_system.h"
 #include "rg_gui.h"
+#include "rg_theme_script.h"
 
 #include <cJSON.h>
 #include <math.h>
@@ -33,6 +34,8 @@ static struct
     const rg_font_t *font;
     int font_index;
     int font_height;
+    rg_font_t *theme_font;          // font.rgf from the current theme folder (replaces the built-in font)
+    const rg_font_t *text_font;     // Temporary font for rg_gui_draw_text (theme scripts), NULL = normal
     bool show_clock;
     bool initialized;
 } gui;
@@ -110,6 +113,9 @@ static void gui_update_geometry(void)
     gui.draw_buffer = get_draw_buffer(gui.screen_width, 18, C_BLACK);
 }
 
+static void update_font(void);
+static size_t glyph_data_size(const rg_font_t *font, const rg_font_glyph_t *glyph);
+
 void rg_gui_init(void)
 {
     gui_update_geometry();
@@ -140,10 +146,84 @@ bool rg_gui_set_language_id(int index)
     return false;
 }
 
+#if defined(RG_TARGET_SDL2) && defined(RG_SDL_DEV_TOOLS)
+// The theme that was asked for, even if it failed to load (a half-saved theme.json for example),
+// so the next reload tries it again instead of staying on the built-in theme.
+static char dev_theme[32];
+static int64_t dev_next_scan;
+static uint32_t dev_signature;
+
+static int dev_signature_cb(const rg_scandir_t *entry, void *arg)
+{
+    const char *name = entry->basename;
+    size_t len = strlen(name);
+    // Ignore hidden files (.DS_Store, editor swap files) and backups, they change without a real edit
+    if (name[0] == '.' || (len && name[len - 1] == '~'))
+        return RG_SCANDIR_SKIP;
+    if (entry->is_file)
+    {
+        uint32_t hash = 2166136261u; // FNV-1a over name, size and time; summed so order doesn't matter
+        for (const char *c = entry->path; *c; c++)
+            hash = (hash ^ (uint8_t)*c) * 16777619u;
+        hash = (hash ^ (uint32_t)entry->size) * 16777619u;
+        hash = (hash ^ (uint32_t)entry->mtime) * 16777619u;
+        *(uint32_t *)arg += hash;
+    }
+    return RG_SCANDIR_CONTINUE;
+}
+
+static uint32_t dev_theme_signature(void)
+{
+    char path[RG_PATH_MAX];
+    uint32_t signature = 0;
+    if (!dev_theme[0])
+        return 0;
+    snprintf(path, sizeof(path), "%s/%s", RG_BASE_PATH_THEMES, dev_theme);
+    rg_storage_scandir(path, dev_signature_cb, &signature, RG_SCANDIR_FILES | RG_SCANDIR_STAT | RG_SCANDIR_RECURSIVE);
+    return signature;
+}
+#endif
+
+bool rg_gui_dev_reload_theme(void)
+{
+#if defined(RG_TARGET_SDL2) && defined(RG_SDL_DEV_TOOLS)
+    bool reload = rg_system_sdl2_take_reload_key();
+    if (reload)
+        RG_LOGI("Reload key pressed, reloading theme '%s'.", dev_theme[0] ? dev_theme : "built-in");
+
+    // Watch the theme's files, twice per second
+    if (rg_system_timer() >= dev_next_scan)
+    {
+        uint32_t signature = dev_theme_signature();
+        if (!reload && signature != dev_signature)
+            RG_LOGI("Theme files changed, reloading theme '%s'.", dev_theme);
+        reload |= signature != dev_signature;
+        dev_signature = signature;
+        dev_next_scan = rg_system_timer() + 500000;
+    }
+
+    if (reload)
+    {
+        char name[sizeof(dev_theme)];
+        strcpy(name, dev_theme);
+        rg_gui_set_theme(name[0] ? name : NULL);
+        dev_signature = dev_theme_signature();
+    }
+    return reload;
+#else
+    return false;
+#endif
+}
+
 bool rg_gui_set_theme(const char *theme_name)
 {
     char pathbuf[RG_PATH_MAX];
     cJSON *new_theme = NULL;
+
+#if defined(RG_TARGET_SDL2) && defined(RG_SDL_DEV_TOOLS)
+    snprintf(dev_theme, sizeof(dev_theme), "%s", theme_name ? theme_name : "");
+    dev_signature = dev_theme_signature(); // Switching themes isn't a change to reload for
+#endif
 
     // Cleanup the current theme
     cJSON_Delete(gui.theme_obj);
@@ -191,6 +271,29 @@ bool rg_gui_set_theme(const char *theme_name)
     gui.style.scrollbar = rg_gui_get_theme_color("dialog", "scrollbar", C_WHITE);
     gui.style.shadow = rg_gui_get_theme_color("dialog", "shadow", C_NONE);
 
+    // Themes can come with their own font (font.rgf)
+    gui.text_font = NULL;
+    free(gui.theme_font);
+    gui.theme_font = NULL;
+    if (gui.theme_name[0])
+    {
+        snprintf(pathbuf, RG_PATH_MAX, "%s/%s/font.rgf", RG_BASE_PATH_THEMES, gui.theme_name);
+        if (rg_storage_exists(pathbuf))
+            gui.theme_font = rg_gui_load_font_file(pathbuf);
+    }
+    update_font();
+
+    // Themes can come with a theme.lua that replaces some drawing functions (see rg_theme_script.h)
+    if (gui.theme_name[0])
+    {
+        snprintf(pathbuf, RG_PATH_MAX, "%s/%s", RG_BASE_PATH_THEMES, gui.theme_name);
+        rg_theme_script_load(pathbuf);
+    }
+    else
+    {
+        rg_theme_script_load(NULL);
+    }
+
     return true;
 }
 
@@ -233,9 +336,8 @@ bool rg_gui_set_font(int index)
     if (index < 0 || index > RG_FONT_MAX - 1)
         return false;
 
-    gui.font = fonts[index];
     gui.font_index = index;
-    gui.font_height = (index < 3) ? (8 + index * 4) : gui.font->height;
+    update_font();
 
     rg_settings_set_number(NS_GLOBAL, SETTING_FONTTYPE, index);
 
@@ -243,6 +345,79 @@ bool rg_gui_set_font(int index)
         gui.font->name, gui.font_height, (float)gui.font_height / gui.font->height);
 
     return true;
+}
+
+// A theme's font (font.rgf) wins over the font chosen in the options
+static void update_font(void)
+{
+    if (gui.theme_font)
+    {
+        gui.font = gui.theme_font;
+        gui.font_height = gui.theme_font->height;
+    }
+    else
+    {
+        gui.font = fonts[gui.font_index];
+        gui.font_height = (gui.font_index < 3) ? (8 + gui.font_index * 4) : gui.font->height;
+    }
+}
+
+// .rgf file: the same glyph data as the built-in fonts (fonts/*.c), after a 24 bytes header:
+//   "RGF1", name[16], type (0=monospace, 1=proportional, 2=proportional anti-aliased), width, height, reserved
+// tools/make_theme_font.py creates them from TTF/OTF fonts.
+rg_font_t *rg_gui_load_font_file(const char *path)
+{
+    uint8_t *file = NULL;
+    size_t file_len = 0;
+    if (!rg_storage_read_file(path, (void **)&file, &file_len, 0))
+        return NULL;
+
+    const size_t header_len = 24;
+    rg_font_t *font = NULL;
+    if (file_len < header_len + 2 || memcmp(file, "RGF1", 4) != 0 || file[20] > 2)
+    {
+        RG_LOGE("'%s' isn't a Retro-Go font file", path);
+        goto done;
+    }
+
+    // Walk the glyphs to make sure the data ends with the terminator (no reading past the end later)
+    const uint8_t *data = file + header_len;
+    size_t data_len = file_len - header_len, pos = 0, chars = 0;
+    rg_font_t font_type = {.type = file[20]};
+    while (pos + 2 <= data_len && (data[pos] | data[pos + 1]) != 0)
+    {
+        if (pos + sizeof(rg_font_glyph_t) > data_len)
+            break;
+        const rg_font_glyph_t *glyph = (const rg_font_glyph_t *)(data + pos);
+        pos += sizeof(rg_font_glyph_t) + glyph_data_size(&font_type, glyph);
+        chars++;
+    }
+    if (pos + 2 > data_len || (data[pos] | data[pos + 1]) != 0 || file[22] == 0)
+    {
+        RG_LOGE("Font file '%s' is damaged", path);
+        goto done;
+    }
+
+    font = rg_alloc(sizeof(rg_font_t) + pos + 2, MEM_SLOW | MEM_NOPANIC);
+    if (!font)
+        goto done;
+    memcpy(font->name, file + 4, sizeof(font->name));
+    font->name[sizeof(font->name) - 1] = 0;
+    font->type = file[20];
+    font->width = file[21];
+    font->height = file[22];
+    font->chars = chars;
+    memcpy(font->data, data, pos + 2);
+    RG_LOGI("Font loaded: '%s' (%s, height=%d, %d glyphs)", path, font->name, font->height, (int)chars);
+
+done:
+    free(file);
+    return font;
+}
+
+void rg_gui_set_text_font(const rg_font_t *font)
+{
+    gui.text_font = font;
 }
 
 void rg_gui_set_surface(rg_surface_t *surface)
@@ -298,6 +473,68 @@ void rg_gui_copy_buffer(int left, int top, int width, int height, int stride, co
     }
 }
 
+static inline uint16_t blend_565(uint16_t fg, uint16_t bg, int alpha)
+{
+    // alpha 0-255. Each channel: bg + (fg - bg) * alpha / 255 (approximated with / 256)
+    int a = alpha + (alpha >> 7);
+    int r = ((bg >> 11) & 0x1F) + (((((fg >> 11) & 0x1F) - ((bg >> 11) & 0x1F)) * a) >> 8);
+    int g = ((bg >> 5) & 0x3F) + (((((fg >> 5) & 0x3F) - ((bg >> 5) & 0x3F)) * a) >> 8);
+    int b = (bg & 0x1F) + ((((fg & 0x1F) - (bg & 0x1F)) * a) >> 8);
+    return (r << 11) | (g << 5) | b;
+}
+
+// Font type 2 = proportional with anti-aliasing: 4 bits of coverage per pixel (high nibble first) instead
+// of 1 bit. Only theme fonts (.rgf files) use it, the built-in fonts are type 0 or 1.
+#define FONT_IS_SMOOTH(font) ((font)->type == 2)
+
+static size_t glyph_data_size(const rg_font_t *font, const rg_font_glyph_t *glyph)
+{
+    if (glyph->width == 0)
+        return 0;
+    size_t pixels = glyph->width * glyph->height;
+    return FONT_IS_SMOOTH(font) ? (pixels + 1) / 2 : ((pixels - 1) / 8) + 1;
+}
+
+static const rg_font_glyph_t *find_glyph(const rg_font_t *font, int c)
+{
+    const uint8_t *ptr = font->data;
+    const rg_font_glyph_t *glyph = (const rg_font_glyph_t *)ptr;
+    while (glyph->code && glyph->code != c)
+    {
+        ptr += sizeof(rg_font_glyph_t) + glyph_data_size(font, glyph);
+        glyph = (const rg_font_glyph_t *)ptr;
+    }
+    return glyph->code ? glyph : NULL;
+}
+
+// Draws an anti-aliased glyph into buffer (stride: buffer_width pixels), blending with what's there.
+// threshold: no blending, pixels at least half covered get the color (for when the background is unknown).
+static void draw_smooth_glyph(uint16_t *buffer, int buffer_width, int x, int y, const rg_font_t *font, int points,
+                              const rg_font_glyph_t *glyph, uint16_t color, bool threshold)
+{
+    int xOffset = glyph->xOffset < 0x80 ? glyph->xOffset : -(0xFF - glyph->xOffset);
+    x = RG_MAX(0, x + xOffset);
+    for (int row = 0; row < points; row++)
+    {
+        int src_y = row * font->height / points - glyph->yOffset; // Vertical stretching like get_glyph
+        if (src_y < 0 || src_y >= glyph->height)
+            continue;
+        uint16_t *out = buffer + (y + row) * buffer_width + x;
+        for (int col = 0; col < glyph->width && x + col < buffer_width; col++)
+        {
+            size_t i = src_y * glyph->width + col;
+            int coverage = (glyph->data[i / 2] >> ((i & 1) ? 0 : 4)) & 0xF;
+            if (threshold)
+            {
+                if (coverage >= 8)
+                    out[col] = color;
+            }
+            else if (coverage)
+                out[col] = coverage == 15 ? color : blend_565(color, out[col], coverage * 17);
+        }
+    }
+}
+
 static size_t get_glyph(uint32_t *output, const rg_font_t *font, int points, int c)
 {
     // Some glyphs are always zero width
@@ -312,13 +549,17 @@ static size_t get_glyph(uint32_t *output, const rg_font_t *font, int points, int
     // for (size_t i = 0; i < font->chars && glyph->code && glyph->code != c; ++i)
     while (glyph->code && glyph->code != c)
     {
-        if (glyph->width != 0)
-            ptr += (((glyph->width * glyph->height) - 1) / 8) + 1;
-        ptr += sizeof(rg_font_glyph_t);
+        ptr += sizeof(rg_font_glyph_t) + glyph_data_size(font, glyph);
         glyph = (rg_font_glyph_t *)ptr;
     }
 
-    if (glyph && glyph->code == c) // Glyph found
+    if (glyph && glyph->code == c && FONT_IS_SMOOTH(font) && output)
+    {
+        // Smooth glyphs are drawn by draw_smooth_glyph (rg_gui_draw_text never asks for their bitmap)
+        memset(output, 0, points * 4);
+        return RG_MAX(glyph->width, glyph->xDelta);
+    }
+    else if (glyph && glyph->code == c) // Glyph found
     {
         // Based on code by Boris Lovosevic (https://github.com/loboris)
         int yOffset = glyph->yOffset;
@@ -377,13 +618,15 @@ static size_t get_glyph(uint32_t *output, const rg_font_t *font, int points, int
 rg_rect_t rg_gui_draw_text(int x_pos, int y_pos, int width, const char *text, // const rg_font_t *font,
                            rg_color_t color_fg, rg_color_t color_bg, uint32_t flags)
 {
-    const rg_font_t *font = gui.font;
+    const rg_font_t *font = gui.text_font ? gui.text_font : gui.font;
     int padding = (flags & RG_TEXT_NO_PADDING) ? 0 : 1;
-    int font_height = (flags & RG_TEXT_BIGGER) ? gui.font_height * 2 : gui.font_height;
+    int base_height = gui.text_font ? gui.text_font->height : gui.font_height;
+    int font_height = (flags & RG_TEXT_BIGGER) ? base_height * 2 : base_height;
     int monospace = ((flags & RG_TEXT_MONOSPACE) || font->type == 0) ? font->width : 0;
     int line_height = font_height + padding * 2;
     int line_count = 0;
     bool transparency = color_fg == C_TRANSPARENT || color_bg == C_TRANSPARENT;
+    bool smooth = FONT_IS_SMOOTH(font);
     // int16_t line_breaks[64], line_width_cache[64];
 
     if (!text || *text == 0)
@@ -447,15 +690,33 @@ rg_rect_t rg_gui_draw_text(int x_pos, int y_pos, int width, const char *text, //
         }
 
         uint16_t *draw_buffer = NULL;
+        bool copy_transparency = transparency;
 
         if (!(flags & RG_TEXT_DUMMY_DRAW))
+        {
             draw_buffer = get_draw_buffer(draw_width, line_height, color_bg);
+            // Smooth fonts blend with the background: on a transparent background that's what is already
+            // drawn, which can only be read when drawing to a surface (the launcher), not to the screen.
+            if (smooth && color_bg == C_TRANSPARENT && color_fg != C_TRANSPARENT && gui.screen_buffer)
+            {
+                for (int y = 0; y < line_height && y_pos + y_offset + y < gui.screen_height; y++)
+                {
+                    if (y_pos + y_offset + y < 0)
+                        continue;
+                    memcpy(draw_buffer + y * draw_width,
+                           gui.screen_buffer + (y_pos + y_offset + y) * gui.screen_width + x_pos, draw_width * 2);
+                }
+                copy_transparency = false;
+            }
+        }
 
         while (x_offset < draw_width)
         {
             uint32_t bitmap[font_height];
             const char *prev_ptr = ptr;
-            int glyph_width = get_glyph(bitmap, font, font_height, rg_utf8_decode(&ptr));
+            int chr = rg_utf8_decode(&ptr);
+            const rg_font_glyph_t *smooth_glyph = smooth ? find_glyph(font, chr) : NULL;
+            int glyph_width = get_glyph(smooth_glyph ? NULL : bitmap, font, font_height, chr);
             int width = monospace ?: glyph_width;
 
             if (draw_width - x_offset < width) // Do not truncate glyphs
@@ -465,7 +726,12 @@ rg_rect_t rg_gui_draw_text(int x_pos, int y_pos, int width, const char *text, //
                 break;
             }
 
-            if (!(flags & RG_TEXT_DUMMY_DRAW))
+            if (!(flags & RG_TEXT_DUMMY_DRAW) && smooth_glyph)
+            {
+                draw_smooth_glyph(draw_buffer, draw_width, x_offset, padding, font, font_height, smooth_glyph,
+                                  color_fg, copy_transparency);
+            }
+            else if (!(flags & RG_TEXT_DUMMY_DRAW))
             {
                 for (int y = 0; y < font_height; y++)
                 {
@@ -486,7 +752,7 @@ rg_rect_t rg_gui_draw_text(int x_pos, int y_pos, int width, const char *text, //
         }
 
         if (!(flags & RG_TEXT_DUMMY_DRAW))
-            rg_gui_copy_buffer(x_pos, y_pos + y_offset, draw_width, line_height, 0, draw_buffer, transparency);
+            rg_gui_copy_buffer(x_pos, y_pos + y_offset, draw_width, line_height, 0, draw_buffer, copy_transparency);
 
         y_offset += line_height;
 
@@ -531,8 +797,66 @@ void rg_gui_draw_rect(int x_pos, int y_pos, int width, int height, int border_si
     }
 }
 
+
+// Images with transparency (PNG alpha, see rg_surface_t.alpha). Blended with what's already drawn when
+// drawing to a surface (the launcher), or with the dialog background color when drawing straight to the
+// screen (which can't be read back). Scaling is nearest neighbour.
+// The image's top-left src_width x src_height part is drawn at width x height.
+static void draw_image_alpha(int x_pos, int y_pos, int width, int height, int src_width, int src_height,
+                             const rg_image_t *img)
+{
+    if (width <= 0 || height <= 0)
+        return;
+
+    int left = get_horizontal_position(x_pos, width);
+    int top = get_vertical_position(y_pos, height);
+    int x_start = RG_MAX(0, -left), y_start = RG_MAX(0, -top);
+    int x_end = RG_MIN(width, gui.screen_width - left), y_end = RG_MIN(height, gui.screen_height - top);
+    if (x_start >= x_end || y_start >= y_end)
+        return;
+
+    rg_color_t matte = gui.style.box_background;
+    if (matte < 0 || matte == C_TRANSPARENT)
+        matte = C_BLACK;
+
+    uint16_t line[x_end - x_start];
+    for (int y = y_start; y < y_end; ++y)
+    {
+        int src_y = y * src_height / height;
+        const uint16_t *src = (const uint16_t *)((const uint8_t *)img->data + src_y * img->stride);
+        const uint8_t *src_alpha = img->alpha + src_y * img->width;
+        uint16_t *dst = gui.screen_buffer ? gui.screen_buffer + (top + y) * gui.screen_width + left : NULL;
+        for (int x = x_start; x < x_end; ++x)
+        {
+            int src_x = x * src_width / width;
+            int alpha = src_alpha[src_x];
+            uint16_t bg = dst ? dst[x] : (uint16_t)matte;
+            uint16_t pixel = alpha == 255 ? src[src_x] : alpha == 0 ? bg : blend_565(src[src_x], bg, alpha);
+            if (dst)
+                dst[x] = pixel;
+            else
+                line[x - x_start] = pixel;
+        }
+        if (!dst)
+            rg_display_write_rect(left + x_start, top + y, x_end - x_start, 1, 0, line, 0);
+    }
+}
+
 void rg_gui_draw_image(int x_pos, int y_pos, int width, int height, bool resample, const rg_image_t *img)
 {
+    if (img && img->alpha)
+    {
+        // Same sizing rules as below: resample scales to width x height, otherwise width/height only crop
+        if (resample && width && height)
+            draw_image_alpha(x_pos, y_pos, width, height, img->width, img->height, img);
+        else
+        {
+            int w = width ? RG_MIN(width, img->width) : img->width;
+            int h = height ? RG_MIN(height, img->height) : img->height;
+            draw_image_alpha(x_pos, y_pos, w, h, w, h, img);
+        }
+        return;
+    }
     if (img && resample && (width && height) && (width != img->width || height != img->height))
     {
         rg_image_t *new_img = rg_surface_resize(img, width, height);
@@ -675,6 +999,10 @@ static size_t get_dialog_items_count(const rg_gui_option_t *options)
 rg_rect_t rg_gui_draw_dialog(const char *title, const rg_gui_option_t *options, size_t options_count, int sel) // const rg_rect_t *rect,
 {
     RG_ASSERT_ARG(options || options_count == 0);
+
+    rg_rect_t script_rect;
+    if (rg_theme_script_draw_dialog(title, options, options_count, sel, &script_rect))
+        return script_rect;
 
     const int sep_width = TEXT_RECT(": ", 0).width;
     const int font_height = gui.font_height;
@@ -992,6 +1320,13 @@ intptr_t rg_gui_dialog(const char *title, const rg_gui_option_t *options_const, 
                 rg_display_force_redraw();
                 rg_gui_draw_status_bars();
             }
+            redraw = true;
+        }
+
+        if (rg_gui_dev_reload_theme())
+        {
+            rg_display_force_redraw();
+            rg_gui_draw_status_bars();
             redraw = true;
         }
 
@@ -1678,6 +2013,19 @@ static rg_gui_event_t timezone_cb(rg_gui_option_t *option, rg_gui_event_t event)
 
 static rg_gui_event_t font_type_cb(rg_gui_option_t *option, rg_gui_event_t event)
 {
+    if (gui.theme_font)
+    {
+        // The theme's font is used until another font is picked here (it comes back with the theme)
+        if (event == RG_DIALOG_PREV || event == RG_DIALOG_NEXT)
+        {
+            free(gui.theme_font);
+            gui.theme_font = NULL;
+            update_font();
+            return RG_DIALOG_REDRAW;
+        }
+        snprintf(option->value, 32, "%s (theme)", gui.font->name);
+        return RG_DIALOG_VOID;
+    }
     if (event == RG_DIALOG_PREV && rg_gui_set_font(gui.font_index - 1))
         return RG_DIALOG_REDRAW;
     if (event == RG_DIALOG_NEXT && rg_gui_set_font(gui.font_index + 1))

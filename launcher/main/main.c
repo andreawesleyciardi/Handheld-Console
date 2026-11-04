@@ -259,6 +259,12 @@ static void retro_loop(void)
             redraw_pending = true;
         }
 
+        if (rg_gui_dev_reload_theme()) // Desktop developer builds only (F5 or a theme file was saved)
+        {
+            gui_update_theme();
+            redraw_pending = true;
+        }
+
         int64_t start_time = rg_system_timer();
 
         if (!tab->enabled && !change_tab)
