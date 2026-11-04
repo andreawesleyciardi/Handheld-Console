@@ -1,0 +1,49 @@
+{
+    "description": "Midnight: adapted from the Recalbox theme by Benoit Bounar (CC BY-NC-SA 4.0), scripted layout (theme.lua)",
+    "website": "https://www.bounar.fr/Themes_es/Midnight/",
+    "author": "Benoit Bounar (original), Andrea Ciardi (Retro-Go adaptation)",
+    "dialog": {
+        "__comment": "Used by the built-in drawing if theme.lua is missing or fails. background is also the color images with transparency are blended with in menus.",
+        "background": "0x2967",
+        "foreground": "0xFFFF",
+        "border": "0x2967",
+        "header": "0xFFFF",
+        "scrollbar": "0x4218",
+        "shadow": "none",
+        "item_standard": "0xFFFF",
+        "item_disabled": "0x6B70",
+        "item_message": "0xCE79"
+    },
+    "launcher_1": {
+        "background": "0x0000",
+        "foreground": "0xFFFF",
+        "list_standard_bg": "transparent",
+        "list_standard_fg": "0xCE79",
+        "list_selected_bg": "0x4218",
+        "list_selected_fg": "0xFFFF"
+    },
+    "launcher_2": {
+        "background": "0x0000",
+        "foreground": "0xFFFF",
+        "list_standard_bg": "transparent",
+        "list_standard_fg": "0xCE79",
+        "list_selected_bg": "transparent",
+        "list_selected_fg": "0x4218"
+    },
+    "launcher_3": {
+        "background": "0x0861",
+        "foreground": "0xFFFF",
+        "list_standard_bg": "transparent",
+        "list_standard_fg": "0x73AE",
+        "list_selected_bg": "0x4218",
+        "list_selected_fg": "0xFFFF"
+    },
+    "launcher_4": {
+        "background": "0x0861",
+        "foreground": "0xFFFF",
+        "list_standard_bg": "transparent",
+        "list_standard_fg": "0x73AE",
+        "list_selected_bg": "0xFFFF",
+        "list_selected_fg": "0x18EB"
+    }
+}
