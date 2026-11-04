@@ -1,0 +1,49 @@
+{
+    "description": "Midnight Classic: dark blue, scripted layout (theme.lua)",
+    "website": "https://github.com/andreawesleyciardi/Handheld",
+    "author": "Andrea Ciardi",
+    "dialog": {
+        "__comment": "Used by the built-in drawing if theme.lua is missing or fails",
+        "background": "0x10A7",
+        "foreground": "0xE73E",
+        "border": "0x7AFF",
+        "header": "0xFFFF",
+        "scrollbar": "0x3DFF",
+        "shadow": "none",
+        "item_standard": "0xE73E",
+        "item_disabled": "0x4A4F",
+        "item_message": "0x8C97"
+    },
+    "launcher_1": {
+        "background": "0x0884",
+        "foreground": "0xE73E",
+        "list_standard_bg": "transparent",
+        "list_standard_fg": "0x8C97",
+        "list_selected_bg": "0x290C",
+        "list_selected_fg": "0xFFFF"
+    },
+    "launcher_2": {
+        "background": "0x0884",
+        "foreground": "0xE73E",
+        "list_standard_bg": "transparent",
+        "list_standard_fg": "0x8C97",
+        "list_selected_bg": "transparent",
+        "list_selected_fg": "0x3DFF"
+    },
+    "launcher_3": {
+        "background": "0x0884",
+        "foreground": "0xE73E",
+        "list_standard_bg": "transparent",
+        "list_standard_fg": "0x8C97",
+        "list_selected_bg": "0x7AFF",
+        "list_selected_fg": "0xFFFF"
+    },
+    "launcher_4": {
+        "background": "0x0884",
+        "foreground": "0xE73E",
+        "list_standard_bg": "transparent",
+        "list_standard_fg": "0x4A4F",
+        "list_selected_bg": "0xE73E",
+        "list_selected_fg": "0x0884"
+    }
+}
