@@ -6,10 +6,12 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/time.h>
 #include <time.h>
 
 #include "bitmaps/image_hourglass.h"
+#include "bitmaps/image_splash_default.h"
 #include "fonts/fonts.h"
 
 static struct
@@ -36,6 +38,7 @@ static struct
     int font_height;
     rg_font_t *theme_font;          // font.rgf from the current theme folder (replaces the built-in font)
     const rg_font_t *text_font;     // Temporary font for rg_gui_draw_text (theme scripts), NULL = normal
+    int text_scroll;                // Temporary left shift of text in pixels (theme scripts), 0 = normal
     bool show_clock;
     bool initialized;
 } gui;
@@ -277,7 +280,9 @@ bool rg_gui_set_theme(const char *theme_name)
     gui.theme_font = NULL;
     if (gui.theme_name[0])
     {
-        snprintf(pathbuf, RG_PATH_MAX, "%s/%s/font.rgf", RG_BASE_PATH_THEMES, gui.theme_name);
+        char theme_path[RG_PATH_MAX];
+        snprintf(theme_path, RG_PATH_MAX, "%s/%s", RG_BASE_PATH_THEMES, gui.theme_name);
+        rg_gui_theme_file_path(theme_path, "font.rgf", pathbuf, RG_PATH_MAX);
         if (rg_storage_exists(pathbuf))
             gui.theme_font = rg_gui_load_font_file(pathbuf);
     }
@@ -317,12 +322,22 @@ rg_color_t rg_gui_get_theme_color(const char *section, const char *key, rg_color
     return intval;
 }
 
+// Themes can have files made for one screen size in a <width>x<height> folder (for example 320x240/),
+// used instead of the file with the same name in the theme folder.
+void rg_gui_theme_file_path(const char *theme_path, const char *name, char *out, size_t out_size)
+{
+    snprintf(out, out_size, "%s/%dx%d/%s", theme_path, rg_display_get_width(), rg_display_get_height(), name);
+    if (!rg_storage_exists(out))
+        snprintf(out, out_size, "%s/%s", theme_path, name);
+}
+
 rg_image_t *rg_gui_get_theme_image(const char *name)
 {
-    char pathbuf[RG_PATH_MAX];
+    char theme_path[RG_PATH_MAX], pathbuf[RG_PATH_MAX];
     if (!name || !gui.theme_name[0])
         return NULL;
-    snprintf(pathbuf, RG_PATH_MAX, "%s/%s/%s", RG_BASE_PATH_THEMES, gui.theme_name, name);
+    snprintf(theme_path, RG_PATH_MAX, "%s/%s", RG_BASE_PATH_THEMES, gui.theme_name);
+    rg_gui_theme_file_path(theme_path, name, pathbuf, sizeof(pathbuf));
     return rg_surface_load_image_file(pathbuf, 0);
 }
 
@@ -420,6 +435,11 @@ void rg_gui_set_text_font(const rg_font_t *font)
     gui.text_font = font;
 }
 
+void rg_gui_set_text_scroll(int pixels)
+{
+    gui.text_scroll = RG_MAX(0, pixels);
+}
+
 void rg_gui_set_surface(rg_surface_t *surface)
 {
     gui.screen_buffer = surface ? surface->data : NULL;
@@ -513,14 +533,14 @@ static void draw_smooth_glyph(uint16_t *buffer, int buffer_width, int x, int y, 
                               const rg_font_glyph_t *glyph, uint16_t color, bool threshold)
 {
     int xOffset = glyph->xOffset < 0x80 ? glyph->xOffset : -(0xFF - glyph->xOffset);
-    x = RG_MAX(0, x + xOffset);
+    x += xOffset;
     for (int row = 0; row < points; row++)
     {
         int src_y = row * font->height / points - glyph->yOffset; // Vertical stretching like get_glyph
         if (src_y < 0 || src_y >= glyph->height)
             continue;
         uint16_t *out = buffer + (y + row) * buffer_width + x;
-        for (int col = 0; col < glyph->width && x + col < buffer_width; col++)
+        for (int col = RG_MAX(0, -x); col < glyph->width && x + col < buffer_width; col++)
         {
             size_t i = src_y * glyph->width + col;
             int coverage = (glyph->data[i / 2] >> ((i & 1) ? 0 : 4)) & 0xF;
@@ -689,6 +709,8 @@ rg_rect_t rg_gui_draw_text(int x_pos, int y_pos, int width, const char *text, //
                 x_offset = draw_width - x_offset;
         }
 
+        x_offset -= gui.text_scroll; // Scrolled text starts left of the box and is cut at its edges
+
         uint16_t *draw_buffer = NULL;
         bool copy_transparency = transparency;
 
@@ -739,7 +761,7 @@ rg_rect_t rg_gui_draw_text(int x_pos, int y_pos, int width, const char *text, //
                     if (row != 0) // get_draw_buffer fills the bg color, nothing to do if row empty
                     {
                         uint16_t *output = &draw_buffer[(draw_width * (y + padding)) + x_offset];
-                        for (int x = 0; x < width; x++)
+                        for (int x = RG_MAX(0, -x_offset); x < width; x++)
                             output[x] = ((row >> x) & 1) ? color_fg : color_bg;
                     }
                 }
@@ -940,6 +962,38 @@ void rg_gui_draw_icons(void)
         sprintf(buffer, "%02d:%02d", time->tm_hour, time->tm_min);
         rg_gui_draw_text(x_pos, y_pos, 0, buffer, C_SILVER, gui.screen_buffer ? C_TRANSPARENT : C_BLACK, 0);
     }
+}
+
+// Splash image shown while an app starts (power on, launching a game). It's the user's: /retro-go/splash.png
+// on the SD card, or the built-in one. Images that aren't the screen size are shrunk to fit (never stretched),
+// centered, with the rest of the screen in the color of the image's top left pixel.
+bool rg_gui_draw_splash(void)
+{
+    char path[RG_PATH_MAX];
+    snprintf(path, sizeof(path), "%s/splash.png", RG_BASE_PATH);
+    rg_image_t *img = rg_storage_exists(path) ? rg_surface_load_image_file(path, 0) : NULL;
+    if (img)
+        RG_LOGI("Splash: '%s'", path);
+    else
+        img = rg_surface_load_image(image_splash_default, sizeof(image_splash_default), 0);
+    if (!img)
+        return false;
+
+    if (img->width == gui.screen_width && img->height == gui.screen_height)
+    {
+        rg_gui_draw_image(0, 0, 0, 0, false, img);
+    }
+    else
+    {
+        float scale = RG_MIN(1.f, RG_MIN((float)gui.screen_width / img->width, (float)gui.screen_height / img->height));
+        int width = RG_MAX(1, (int)(img->width * scale)), height = RG_MAX(1, (int)(img->height * scale));
+        rg_color_t corner = ((const uint16_t *)img->data)[0];
+        rg_gui_draw_rect(0, 0, gui.screen_width, gui.screen_height, 0, corner, corner);
+        rg_gui_draw_image((gui.screen_width - width) / 2, (gui.screen_height - height) / 2, width, height,
+                          width != img->width || height != img->height, img);
+    }
+    rg_surface_free(img);
+    return true;
 }
 
 void rg_gui_draw_hourglass(void)
@@ -1344,6 +1398,10 @@ intptr_t rg_gui_dialog(const char *title, const rg_gui_option_t *options_const, 
     rg_display_force_redraw();
     // free(shadow_options);
     free(shadow_text_buffer);
+
+    // In games the theme only draws menus: give its memory back to the emulator when a menu closes
+    if (!rg_system_get_app()->isLauncher)
+        rg_theme_script_trim();
 
     if (event == RG_DIALOG_CANCEL || sel < 0)
         return RG_DIALOG_CANCELLED;
@@ -1928,6 +1986,16 @@ static rg_gui_event_t speedup_update_cb(rg_gui_option_t *option, rg_gui_event_t 
     {
         float change = (event == RG_DIALOG_NEXT) ? 0.5f : -0.5f;
         rg_system_set_app_speed(rg_system_get_app_speed() + change);
+        // Remembered for this game: it starts at this speed next time
+        const char *rom = rg_system_get_app()->romPath;
+        if (rom && rom[0])
+        {
+            if (rg_system_get_app_speed() == 1.f)
+                rg_settings_delete(NS_FILE, SETTING_GAME_SPEED);
+            else
+                rg_settings_set_number(NS_FILE, SETTING_GAME_SPEED, rg_system_get_app_speed());
+            rg_settings_commit();
+        }
     }
     sprintf(option->value, "%.1fx", rg_system_get_app_speed());
     return RG_DIALOG_VOID;
@@ -2037,18 +2105,118 @@ static rg_gui_event_t font_type_cb(rg_gui_option_t *option, rg_gui_event_t event
     return RG_DIALOG_VOID;
 }
 
+// Theme picker: the highlighted theme's preview.png fills the screen behind the list, with its
+// description and author from theme.json at the bottom.
+static void draw_theme_preview(const char *name)
+{
+    char theme_path[RG_PATH_MAX], path[RG_PATH_MAX], info[160] = "";
+    rg_image_t *preview = NULL;
+
+    if (name && name[0])
+    {
+        snprintf(theme_path, sizeof(theme_path), "%s/%s", RG_BASE_PATH_THEMES, name);
+        rg_gui_theme_file_path(theme_path, "preview.png", path, sizeof(path));
+        preview = rg_surface_load_image_file(path, 0);
+
+        char *data = NULL;
+        size_t data_len;
+        snprintf(path, sizeof(path), "%s/theme.json", theme_path);
+        if (rg_storage_read_file(path, (void **)&data, &data_len, 0))
+        {
+            cJSON *json = cJSON_Parse(data);
+            if (!json)
+                json = cJSON_Parse(rg_json_fixup(data));
+            const char *description = cJSON_GetStringValue(cJSON_GetObjectItem(json, "description"));
+            const char *author = cJSON_GetStringValue(cJSON_GetObjectItem(json, "author"));
+            if (description && author)
+                snprintf(info, sizeof(info), "%s\nby %s", description, author);
+            else if (description || author)
+                snprintf(info, sizeof(info), "%s", description ? description : author);
+            cJSON_Delete(json);
+            free(data);
+        }
+    }
+    else
+    {
+        snprintf(info, sizeof(info), "%s", _("Retro-Go's built-in look"));
+    }
+
+    if (preview)
+        rg_gui_draw_image(0, 0, gui.screen_width, gui.screen_height, true, preview);
+    else
+    {
+        rg_gui_draw_rect(0, 0, gui.screen_width, gui.screen_height, 0, C_BLACK, C_BLACK);
+        rg_gui_draw_text(RG_GUI_CENTER, gui.font_height + 8, 0, _("No preview"), C_DIM_GRAY, C_BLACK, 0);
+    }
+    rg_surface_free(preview);
+
+    if (info[0])
+    {
+        int height = rg_gui_draw_text(0, 0, gui.screen_width - 16, info, 0, 0, RG_TEXT_MULTILINE | RG_TEXT_DUMMY_DRAW).height + 8;
+        rg_gui_draw_rect(0, gui.screen_height - height, gui.screen_width, height, 0, C_BLACK, C_BLACK);
+        rg_gui_draw_text(8, gui.screen_height - height + 4, gui.screen_width - 16, info, C_WHITE, C_BLACK,
+                         RG_TEXT_MULTILINE | RG_TEXT_ALIGN_CENTER);
+    }
+}
+
+static rg_gui_event_t theme_picker_cb(rg_gui_option_t *option, rg_gui_event_t event)
+{
+    if (event == RG_DIALOG_FOCUS_GAINED)
+        draw_theme_preview((const char *)option->arg);
+    else if (event == RG_DIALOG_ENTER)
+        return RG_DIALOG_SELECT;
+    return RG_DIALOG_VOID;
+}
+
+static int theme_picker_scan_cb(const rg_scandir_t *entry, void *arg)
+{
+    file_picker_opts_t *f = arg;
+    if (entry->basename[0] == '.' || f->count >= 63)
+        return RG_SCANDIR_SKIP;
+    char *name = rg_bucket_insert(f->filenames, entry->basename, strlen(entry->basename) + 1);
+    f->options[f->count++] = (rg_gui_option_t){(intptr_t)name, name, NULL, RG_DIALOG_FLAG_NORMAL, &theme_picker_cb};
+    return RG_SCANDIR_SKIP; // Don't look inside theme folders
+}
+
+static int theme_picker_compare(const void *a, const void *b)
+{
+    return strcasecmp(((const rg_gui_option_t *)a)->label, ((const rg_gui_option_t *)b)->label);
+}
+
 static rg_gui_event_t theme_cb(rg_gui_option_t *option, rg_gui_event_t event)
 {
     if (event == RG_DIALOG_ENTER)
     {
-        char *path = rg_gui_file_picker("Theme", RG_BASE_PATH_THEMES, NULL, false, true);
-        if (path != NULL)
+        static char default_name[] = "";
+        file_picker_opts_t themes = {
+            .options = calloc(65, sizeof(rg_gui_option_t)),
+            .filenames = rg_bucket_create(2048, 1),
+        };
+        if (!themes.options || !themes.filenames)
         {
-            const char *theme = strlen(path) > 0 ? rg_basename(path) : NULL;
-            rg_gui_set_theme(theme);
-            free(path);
-            return RG_DIALOG_REDRAW;
+            free(themes.options);
+            if (themes.filenames)
+                rg_bucket_free(themes.filenames);
+            return RG_DIALOG_VOID;
         }
+        themes.options[themes.count++] = (rg_gui_option_t){(intptr_t)default_name, _("Built-in"), NULL, RG_DIALOG_FLAG_NORMAL, &theme_picker_cb};
+        rg_storage_scandir(RG_BASE_PATH_THEMES, theme_picker_scan_cb, &themes, RG_SCANDIR_DIRS);
+        qsort(themes.options + 1, themes.count - 1, sizeof(rg_gui_option_t), theme_picker_compare);
+        themes.options[themes.count] = (rg_gui_option_t)RG_DIALOG_END;
+
+        // Start on the current theme
+        int current = 0;
+        for (size_t i = 1; i < themes.count; ++i)
+            if (rg_gui_get_theme_name() && strcmp((const char *)themes.options[i].arg, rg_gui_get_theme_name()) == 0)
+                current = i;
+
+        intptr_t selected = rg_gui_dialog(_("Theme"), themes.options, current);
+        if (selected != RG_DIALOG_CANCELLED)
+            rg_gui_set_theme(((const char *)selected)[0] ? (const char *)selected : NULL);
+
+        free(themes.options);
+        rg_bucket_free(themes.filenames);
+        return RG_DIALOG_REDRAW;
     }
 
     strcpy(option->value, rg_gui_get_theme_name() ?: "Default");

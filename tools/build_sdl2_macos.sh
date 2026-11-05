@@ -9,6 +9,9 @@
 #   tools/build_sdl2_macos.sh launcher   rebuild only the launcher, then run (fast, for UI/theme work)
 #   tools/build_sdl2_macos.sh run        run without building
 #
+# Other screen sizes (to test themes for other devices): SIZE=320x240 tools/build_sdl2_macos.sh
+# The size is built into the programs: build again without SIZE to go back to 480x320.
+#
 # The emulated SD card is ./sd (git-ignored). Put ROMs in ./sd/roms/<system>/.
 # ./sd/retro-go/themes is a symlink to ./themes, so theme edits in the repo show up immediately.
 #
@@ -25,9 +28,19 @@ if ! command -v sdl2-config >/dev/null; then
     exit 1
 fi
 
+SIZE_FLAGS=""
+if [ -n "$SIZE" ]; then
+    if ! [[ "$SIZE" =~ ^[0-9]+x[0-9]+$ ]]; then
+        echo "SIZE must look like 320x240" >&2
+        exit 1
+    fi
+    SIZE_FLAGS="-DRG_SDL_WIDTH=${SIZE%x*} -DRG_SDL_HEIGHT=${SIZE#*x}"
+    echo "Screen size: $SIZE"
+fi
+
 CC="clang"
 CFLAGS="-O2 -g -DRG_TARGET_SDL2 -DRG_TARGET_SDL2_HANDHELD -DRETRO_GO -DCJSON_HIDE_SYMBOLS -DSDL_MAIN_HANDLED=1 \
-        -DRG_BUILD_INFO=\"SDL2-macOS\" -Dapp_main=SDL_Main -DRG_SDL_DEV_TOOLS \
+        -DRG_BUILD_INFO=\"SDL2-macOS\" -Dapp_main=SDL_Main -DRG_SDL_DEV_TOOLS $SIZE_FLAGS \
         -Wno-error=implicit-function-declaration -Wno-deprecated-declarations \
         $(sdl2-config --cflags) -I$(brew --prefix)/include -Itools/sdl2-macos/include"
 INCLUDES="-Icomponents/retro-go -Icomponents/retro-go/libs/cJSON -Icomponents/retro-go/libs/lodepng -Icomponents/retro-go/libs/miniz"

@@ -201,6 +201,7 @@ static void retro_loop(void)
     bool redraw_pending = true;
 
     gui_init(app->isColdBoot);
+    gui_script_init();
     applications_init();
     bookmarks_init();
     // browser_init();
@@ -345,6 +346,9 @@ static void retro_loop(void)
                 gui.browse = true;
             }
         }
+
+        if (gui_script_redraw_due()) // Theme animations (rg.redraw_in)
+            redraw_pending = true;
 
         if (redraw_pending)
         {

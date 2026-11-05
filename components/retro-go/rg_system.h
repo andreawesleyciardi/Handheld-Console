@@ -248,6 +248,7 @@ rg_app_t *rg_system_get_app(void);
 rg_stats_t rg_system_get_stats(void);
 
 // Speed and Overclock
+#define SETTING_GAME_SPEED "Speed" // Per game (NS_FILE): speed chosen in the game menu
 void rg_system_set_app_speed(float speed);
 float rg_system_get_app_speed(void);
 void rg_system_set_overclock(int level);

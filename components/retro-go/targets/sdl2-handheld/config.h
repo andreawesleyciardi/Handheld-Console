@@ -11,18 +11,23 @@
 #define RG_AUDIO_USE_EXT_DAC        0
 #define RG_AUDIO_USE_SDL2           1   // The device has no audio, but sound is handy when testing on desktop
 
-// Video (same resolution as the ILI9488 on the device)
+// Video (same resolution as the ILI9488 on the device, unless SIZE is given to the build script)
 #define RG_SCREEN_DRIVER            99
 #define RG_SCREEN_HOST              0
 #define RG_SCREEN_SPEED             0
 #define RG_SCREEN_BACKLIGHT         1
-#define RG_SCREEN_WIDTH             480
-#define RG_SCREEN_HEIGHT            320
+// Other sizes can be previewed with SIZE=320x240 tools/build_sdl2_macos.sh (sets RG_SDL_WIDTH/HEIGHT)
+#ifndef RG_SDL_WIDTH
+#define RG_SDL_WIDTH                480
+#define RG_SDL_HEIGHT               320
+#endif
+#define RG_SCREEN_WIDTH             RG_SDL_WIDTH
+#define RG_SCREEN_HEIGHT            RG_SDL_HEIGHT
 #define RG_SCREEN_ROTATE            0
 #define RG_SCREEN_VISIBLE_AREA      {0, 0, 0, 0}
 #define RG_SCREEN_SAFE_AREA         {0, 0, 0, 0}
 #define RG_SCREEN_INIT()
-#define RG_SCREEN_SDL_SCALE         2   // Window is 960x640 so the 480x320 screen is readable on a laptop
+#define RG_SCREEN_SDL_SCALE         2   // Window is twice the screen size (960x640) so it is readable on a laptop
 #define RG_SCREEN_SDL_NATIVE_ORDER  1   // Read pixels like the device's ILI9488 driver does, so colors match the device
 
 // Input: the same 12 buttons as the device. There is no MENU/OPTION button: like on the

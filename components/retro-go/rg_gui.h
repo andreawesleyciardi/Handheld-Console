@@ -111,8 +111,11 @@ void rg_gui_set_surface(rg_surface_t *surface);
 bool rg_gui_set_font(int index);
 rg_font_t *rg_gui_load_font_file(const char *path); // .rgf font file (see THEMING.md), free() it when done
 void rg_gui_set_text_font(const rg_font_t *font);   // Draw text with this font until called with NULL
+void rg_gui_set_text_scroll(int pixels);            // Shift text left by this many pixels until called with 0
 bool rg_gui_set_theme(const char *name);
 const char *rg_gui_get_theme_name(void);
+// Path of a theme file, from the <width>x<height> folder for this screen if it has one (see THEMING.md)
+void rg_gui_theme_file_path(const char *theme_path, const char *name, char *out, size_t out_size);
 // Desktop developer builds (RG_SDL_DEV_TOOLS): reloads the theme when Cmd+R or F5 is pressed or one of its
 // files changed, and returns true if it did. Always returns false on the device.
 bool rg_gui_dev_reload_theme(void);
@@ -130,6 +133,7 @@ void rg_gui_draw_rect(int x_pos, int y_pos, int width, int height, int border_si
 void rg_gui_draw_image(int x_pos, int y_pos, int width, int height, bool resample, const rg_image_t *img);
 void rg_gui_draw_icons(void);
 void rg_gui_draw_hourglass(void); // This should be moved to system or display...
+bool rg_gui_draw_splash(void);    // /retro-go/splash.png, or the built-in splash
 void rg_gui_draw_status_bars(void);
 void rg_gui_draw_virtual_keyboard(int x_pos, int y_pos, const rg_keyboard_layout_t *map, int cursor_pos, bool partial_redraw);
 void rg_gui_draw_input_screen(const char *title, const char *message, const char *input_buffer,

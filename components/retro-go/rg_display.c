@@ -489,8 +489,28 @@ char *rg_display_get_border(void)
     return rg_settings_get_string(NS_APP, SETTING_BORDER, NULL);
 }
 
+// Keeps what's on screen (the splash image) until a given time: the first frame drawn after
+// rg_display_hold() waits for it, so the app loads in the meantime instead of after.
+static int64_t hold_until;
+
+void rg_display_hold(int ms)
+{
+    hold_until = rg_system_timer() + (int64_t)ms * 1000;
+}
+
+static void wait_for_hold(void)
+{
+    if (!hold_until)
+        return;
+    int64_t remaining;
+    while ((remaining = hold_until - rg_system_timer()) > 0)
+        rg_task_delay(RG_MIN(remaining / 1000 + 1, 50));
+    hold_until = 0;
+}
+
 void rg_display_submit(const rg_surface_t *update, uint32_t flags)
 {
+    wait_for_hold();
     const int64_t time_start = rg_system_timer();
 
     // Those things should probably be asserted, but this is a new system let's be forgiving...
@@ -521,6 +541,7 @@ bool rg_display_sync(bool block)
 void rg_display_write_rect(int left, int top, int width, int height, int stride, const uint16_t *buffer, uint32_t flags)
 {
     RG_ASSERT_ARG(buffer);
+    wait_for_hold();
 
     // calc stride before clipping width
     stride = RG_MAX(stride, width * 2);
@@ -645,7 +666,7 @@ void rg_display_init(void)
     display.screen.width -= display.screen.margins.left + display.screen.margins.right;
     display.screen.height -= display.screen.margins.top + display.screen.margins.bottom;
     lcd_init();
-    rg_display_clear(C_RED);
+    rg_display_clear(C_BLACK); // Black rather than red: a splash image or the app follows right after
     rg_task_delay(80); // Wait for the screen be cleared before turning on the backlight (40ms doesn't seem to be enough...)
     lcd_set_backlight(config.backlight);
     display_task_queue = rg_task_create("rg_display", &display_task, NULL, 4 * 1024, RG_TASK_PRIORITY_6, 1);

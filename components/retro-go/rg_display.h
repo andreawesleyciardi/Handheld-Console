@@ -107,6 +107,7 @@ void rg_display_clear_except(int left, int top, int width, int height, uint16_t 
 void rg_display_clear(uint16_t color_le);
 bool rg_display_sync(bool block);
 void rg_display_force_redraw(void);
+void rg_display_hold(int ms); // The next frame drawn waits until ms milliseconds from now (splash image)
 void rg_display_submit(const rg_surface_t *update, uint32_t flags);
 
 rg_display_counters_t rg_display_get_counters(void);

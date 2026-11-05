@@ -5,7 +5,8 @@ A Retro-Go adaptation, for this 480x320 handheld, of **Midnight**, a Recalbox th
 
 The system backgrounds (`background_*.png`) and system logos (`logos/`) come from the original
 theme. They were resized for a 480x320 screen and converted from JPG/SVG to PNG. The fonts come from
-the original theme too (see below). The layout and
+the original theme too (see below). The `320x240` folder has the same images and fonts made for
+320x240 screens, which get their own layout in `theme.lua`. The layout and
 colors of `theme.lua` follow the original theme's system list, game list and menu.
 
 ## License
@@ -22,5 +23,7 @@ same license:
 The fonts (`font.rgf`, `title.rgf`) are Josefin Sans SemiBold by Santiago Orozco, included in the
 original theme, converted with `tools/make_theme_font.py`. Josefin Sans is licensed under the
 [SIL Open Font License 1.1](https://openfontlicense.org).
+
+`preview.png` was made for this adaptation.
 
 The system logos are trademarks of their respective owners.

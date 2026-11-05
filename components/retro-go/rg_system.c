@@ -502,8 +502,16 @@ rg_app_t *rg_system_init(int sampleRate, const rg_handlers_t *handlers, void *_u
     app.saveSlot = (app.bootFlags & RG_BOOT_SLOT_MASK) >> 4;
     app.romPath = app.bootArgs ?: ""; // For whatever reason some of our code isn't NULL-aware, sigh..
 
-    rg_gui_draw_hourglass();
+    // Splash image while the app starts, shown at least 2 seconds (the app loads in the meantime)
+    if (rg_gui_draw_splash())
+        rg_display_hold(2000);
+    else
+        rg_gui_draw_hourglass();
     rg_audio_init(sampleRate);
+
+    // Speed chosen in this game's menu last time (saved per game, see speedup_update_cb in rg_gui.c)
+    if (app.romPath[0])
+        rg_system_set_app_speed(rg_settings_get_number(NS_FILE, SETTING_GAME_SPEED, 1.0));
 
     rg_system_set_timezone(rg_settings_get_string(NS_GLOBAL, SETTING_TIMEZONE, "EST+5"));
     rg_system_load_time();
@@ -1494,7 +1502,7 @@ rg_emu_states_t *rg_emu_get_states(const char *romPath, size_t slots)
 
 bool rg_emu_reset(bool hard)
 {
-    rg_system_set_app_speed(1.f);
+    rg_system_set_app_speed(app.romPath && app.romPath[0] ? rg_settings_get_number(NS_FILE, SETTING_GAME_SPEED, 1.0) : 1.f);
     if (app.handlers.reset)
         return app.handlers.reset(hard);
     return false;

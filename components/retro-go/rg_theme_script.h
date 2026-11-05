@@ -27,6 +27,9 @@
 void rg_theme_script_load(const char *theme_path);
 void rg_theme_script_unload(void);
 bool rg_theme_script_is_loaded(void);
+// Frees the cached images and the script's unused memory (the script stays loaded). Used when a menu
+// closes in games, so the emulator gets the memory back.
+void rg_theme_script_trim(void);
 
 // Adds a function to the `rg` table of every script loaded from now on (and of the current one).
 // Used by apps to expose app-specific helpers (eg: the launcher).

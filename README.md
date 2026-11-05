@@ -140,6 +140,7 @@ brew install sdl2
 tools/build_sdl2_macos.sh            # build launcher + retro-core, then run
 tools/build_sdl2_macos.sh launcher   # rebuild only the launcher, then run (faster for UI work)
 tools/build_sdl2_macos.sh run        # run without rebuilding
+SIZE=320x240 tools/build_sdl2_macos.sh   # preview another screen size (build again without SIZE for 480x320)
 ```
 
 | Device button | Key       |
@@ -166,7 +167,15 @@ DOOM, Mega Drive and MSX aren't available on desktop.
 
 ## Themes
 
-Themes go in `/retro-go/themes/<name>/` on the SD card and are selected in Options → Theme. Besides
+Themes go in `/retro-go/themes/<name>/` on the SD card and are selected in Options → Theme, which shows
+a preview of each theme.
+
+## Splash image
+
+At power on and while a game loads, Retro-Go shows `/retro-go/splash.png` from the SD card, or a built-in
+"RETRO-GO" image if there's none. Use any PNG: the best size is the screen's (480x320 on this handheld).
+Other sizes are shrunk to fit without stretching and centered, and the rest of the screen gets the color
+of the image's top left corner. Besides
 images and colors (see [THEMING.md](THEMING.md)), a theme in this fork can include a `theme.lua` script
 that redraws the launcher and the menus with its own layout, without rebuilding the firmware. Themes
 can also bring their own font (`font.rgf`, made from a TTF with `tools/make_theme_font.py`) and use PNG
@@ -181,6 +190,9 @@ Copy the [`themes/`](themes/) folders to the SD card to install them.
 - DOOM via `prboom-go`
 - Mega Drive / Genesis via `gwenesis`
 - MSX via `fmsx`
+
+The game speed set in a game's menu (Speed, 0.5x to 2.5x) is remembered for that game: it starts at
+that speed next time. It's saved in `/retro-go/config/<game file name>.json`.
 
 Game Boy games use the classic green DMG palette by default. For monochrome
 GB titles, open the emulator's Options menu and change Palette to Pocket,

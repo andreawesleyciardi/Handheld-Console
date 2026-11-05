@@ -18,6 +18,7 @@
 #define MAX_CACHED_IMAGES   64
 #define MAX_CACHED_FONTS    8
 #define IMAGE_CACHE_BUDGET  (2 * 1024 * 1024) // Bytes of decoded images kept; least recently used go first
+#define IMAGE_CACHE_BUDGET_INGAME (256 * 1024) // In games, where emulators need the memory (only menus are themed)
 
 static struct
 {
@@ -141,7 +142,7 @@ static rg_image_t *get_cached_image(lua_State *L, const char *name)
     }
 
     char path[RG_PATH_MAX];
-    snprintf(path, sizeof(path), "%s/%s", script.theme_path, name);
+    rg_gui_theme_file_path(script.theme_path, name, path, sizeof(path));
     rg_image_t *img = rg_surface_load_image_file(path, 0);
     if (!img)
         RG_LOGW("Theme image not found: '%s'", path);
@@ -158,7 +159,8 @@ static rg_image_t *get_cached_image(lua_State *L, const char *name)
             else if (oldest == MAX_CACHED_IMAGES || script.images[i].last_used < script.images[oldest].last_used)
                 oldest = i;
         }
-        if (free_slot != MAX_CACHED_IMAGES && (script.images_bytes + bytes <= IMAGE_CACHE_BUDGET || oldest == MAX_CACHED_IMAGES))
+        size_t budget = rg_system_get_app()->isLauncher ? IMAGE_CACHE_BUDGET : IMAGE_CACHE_BUDGET_INGAME;
+        if (free_slot != MAX_CACHED_IMAGES && (script.images_bytes + bytes <= budget || oldest == MAX_CACHED_IMAGES))
         {
             snprintf(script.images[free_slot].name, sizeof(script.images[free_slot].name), "%s", name);
             script.images[free_slot].img = img;
@@ -197,7 +199,7 @@ static const rg_font_t *get_cached_font(lua_State *L, const char *name)
         if (script.fonts[i].name[0] == 0)
         {
             char path[RG_PATH_MAX];
-            snprintf(path, sizeof(path), "%s/%s", script.theme_path, name);
+            rg_gui_theme_file_path(script.theme_path, name, path, sizeof(path));
             snprintf(script.fonts[i].name, sizeof(script.fonts[i].name), "%s", name);
             script.fonts[i].font = rg_gui_load_font_file(path);
             if (!script.fonts[i].font)
@@ -276,8 +278,17 @@ static int api_text(lua_State *L)
     uint32_t flags = to_text_options(L, 4, &fg, &bg, &width, &font);
     int x = check_int(L, 1), y = check_int(L, 2);
     const char *text = luaL_checkstring(L, 3);
-    rg_gui_set_text_font(font); // Nothing below can raise a Lua error, so the font is always reset
+    int scroll = 0;
+    if (lua_istable(L, 4))
+    {
+        lua_getfield(L, 4, "scroll");
+        scroll = (int)luaL_optinteger(L, -1, 0);
+        lua_pop(L, 1);
+    }
+    rg_gui_set_text_font(font); // Nothing below can raise a Lua error, so these are always reset
+    rg_gui_set_text_scroll(scroll);
     rg_rect_t rect = rg_gui_draw_text(x, y, width, text, fg, bg, flags);
+    rg_gui_set_text_scroll(0);
     rg_gui_set_text_font(NULL);
     lua_pushinteger(L, rect.width);
     lua_pushinteger(L, rect.height);
@@ -519,6 +530,15 @@ void rg_theme_script_load(const char *theme_path)
     }
 
     RG_LOGI("Theme script loaded: '%s' (%d KB)", path, (int)(script.mem_used / 1024));
+}
+
+void rg_theme_script_trim(void)
+{
+    if (!script.L || script.busy)
+        return;
+    for (size_t i = 0; i < MAX_CACHED_IMAGES; ++i)
+        free_cached_image(i);
+    lua_gc(script.L, LUA_GCCOLLECT);
 }
 
 bool rg_theme_script_is_loaded(void)

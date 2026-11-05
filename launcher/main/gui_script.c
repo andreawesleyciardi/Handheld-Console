@@ -144,6 +144,32 @@ static void push_tab(lua_State *L, tab_t *tab, bool need_background)
     lua_setfield(L, -2, "item");
 }
 
+// rg.redraw_in(ms): the launcher redraws after ms milliseconds, for animations (scrolling text, ...).
+// Only the next redraw is scheduled: call it again from the hook to keep animating.
+static int64_t redraw_at;
+
+static int api_redraw_in(lua_State *L)
+{
+    lua_Integer ms = luaL_checkinteger(L, 1);
+    int64_t when = rg_system_timer() + (int64_t)RG_MAX(ms, 0) * 1000;
+    if (!redraw_at || when < redraw_at)
+        redraw_at = when;
+    return 0;
+}
+
+void gui_script_init(void)
+{
+    rg_theme_script_register("redraw_in", api_redraw_in);
+}
+
+bool gui_script_redraw_due(void)
+{
+    if (!redraw_at || rg_system_timer() < redraw_at)
+        return false;
+    redraw_at = 0;
+    return true;
+}
+
 bool gui_script_draw(const char *hook, tab_t *tab)
 {
     if (!tab)
