@@ -17,7 +17,6 @@ Example themes are in the [themes](/themes/) folder of this project:
 | Theme | Shows |
 |--|--|
 | [default](/themes/default/), [classic](/themes/classic/) | Colors and images only |
-| [midnight-classic](/themes/midnight-classic/) | A script that draws everything with shapes (gradient, stars, moon) |
 | [midnight](/themes/midnight/) | A script with images, its own fonts, transparency, animated text and separate layouts for 480x320 and 320x240 screens |
 
 
@@ -250,8 +249,7 @@ If the script fails (Lua error, a hook running longer than 3 seconds, or more th
 error is written to the log and Retro-Go switches back to its built-in drawing until the theme is
 selected again. A broken theme can't make the device unusable.
 
-[midnight](/themes/midnight/theme.lua) is a complete example, and
-[midnight-classic](/themes/midnight-classic/theme.lua) a simpler one.
+[midnight](/themes/midnight/theme.lua) is a complete example.
 
 ### Hooks
 
@@ -335,7 +333,7 @@ Values: `rg.width`, `rg.height` (screen size), `rg.app` (`"launcher"`, `"retro-c
 - **Available Lua libraries:** `string`, `table`, `math`, `utf8`, `coroutine` and the basics. There's no
   file, OS or module access.
 - **Performance:** hooks run on every redraw. Precompute what you can at load time (outside the hooks),
-  as midnight-classic does for its gradient and stars, and only animate with `rg.redraw_in()` while
+  such as tables of colors or positions, and only animate with `rg.redraw_in()` while
   something actually moves.
 
 ### Testing
