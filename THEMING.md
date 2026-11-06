@@ -18,6 +18,7 @@ Example themes are in the [themes](/themes/) folder of this project:
 |--|--|
 | [default](/themes/default/), [classic](/themes/classic/) | Colors and images only |
 | [midnight](/themes/midnight/) | A script with images, its own fonts, transparency, animated text and separate layouts for 480x320 and 320x240 screens |
+| [simplelight](/themes/simplelight/) | A light theme: full-screen images with see-through white areas built into them, colored logos, and a separate layout for 320x240 screens |
 
 
 ## Making a theme, step by step
@@ -212,8 +213,8 @@ decoded into memory (2 bytes per pixel, plus 1 per pixel when they have transpar
 *This is a feature of this fork, upstream Retro-Go doesn't have it.*
 
 `font.rgf` in the theme folder replaces Retro-Go's built-in font for all text, in the launcher and in
-menus. Options → Font shows it as "(theme)". Picking another font there switches back to the built-in
-fonts until the theme is selected again.
+menus. The font is part of the theme: Options → Font shows it as "(theme)" and can't change it. With a
+theme that has no `font.rgf`, Options → Font picks one of the built-in fonts as usual.
 
 `.rgf` files are made from a TTF or OTF font with [`tools/make_theme_font.py`](tools/make_theme_font.py)
 (needs Pillow: `pip install pillow`):
@@ -249,7 +250,7 @@ If the script fails (Lua error, a hook running longer than 3 seconds, or more th
 error is written to the log and Retro-Go switches back to its built-in drawing until the theme is
 selected again. A broken theme can't make the device unusable.
 
-[midnight](/themes/midnight/theme.lua) is a complete example.
+[midnight](/themes/midnight/theme.lua) and [simplelight](/themes/simplelight/theme.lua) are complete examples.
 
 ### Hooks
 

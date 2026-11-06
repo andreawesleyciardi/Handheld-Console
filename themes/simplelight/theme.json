@@ -1,0 +1,25 @@
+{
+    "description": "simplelight for Recalbox, adapted for Retro-Go (CC BY-NC-SA)",
+    "website": "https://www.recalbox.com/",
+    "author": "Nils Bonenberger and the Recalbox community (original), Andrea Ciardi (Retro-Go adaptation)",
+    "dialog": {
+        "__comment": "Used by the built-in drawing if theme.lua is missing or fails. background is also the color images with transparency are blended with in menus.",
+        "background": "0xF7BE",
+        "foreground": "0x39C7",
+        "border": "0xC639",
+        "header": "0x39C7",
+        "scrollbar": "0x39C7",
+        "shadow": "none",
+        "item_standard": "0x39C7",
+        "item_disabled": "0xA514",
+        "item_message": "0x5B0C"
+    },
+    "launcher_1": {
+        "background": "0xF7BE",
+        "foreground": "0x39C7",
+        "list_standard_bg": "transparent",
+        "list_standard_fg": "0x39C7",
+        "list_selected_bg": "0x39C7",
+        "list_selected_fg": "0x94D3"
+    }
+}

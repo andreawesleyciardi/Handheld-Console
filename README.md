@@ -174,7 +174,8 @@ Besides images and colors (see [THEMING.md](THEMING.md)), a theme in this fork c
 `theme.lua` script that redraws the launcher and the menus with its own layout, without rebuilding the
 firmware. Themes can also bring their own font (`font.rgf`, made from a TTF with
 `tools/make_theme_font.py`) and use PNG transparency. The included [`midnight`](themes/midnight/) theme
-(adapted from the Recalbox theme by Benoit Bounar) is an example. Copy the [`themes/`](themes/) folders to
+(adapted from the Recalbox theme by Benoit Bounar) and [`simplelight`](themes/simplelight/) theme (adapted
+from the Recalbox theme by Nils Bonenberger and the Recalbox community) are examples. Copy the [`themes/`](themes/) folders to
 the SD card to install them.
 
 ## Splash image

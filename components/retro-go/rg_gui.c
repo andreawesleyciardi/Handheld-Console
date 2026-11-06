@@ -2081,19 +2081,14 @@ static rg_gui_event_t timezone_cb(rg_gui_option_t *option, rg_gui_event_t event)
 
 static rg_gui_event_t font_type_cb(rg_gui_option_t *option, rg_gui_event_t event)
 {
+    // A theme with its own font (font.rgf) always uses it: the option is shown but can't be changed
     if (gui.theme_font)
     {
-        // The theme's font is used until another font is picked here (it comes back with the theme)
-        if (event == RG_DIALOG_PREV || event == RG_DIALOG_NEXT)
-        {
-            free(gui.theme_font);
-            gui.theme_font = NULL;
-            update_font();
-            return RG_DIALOG_REDRAW;
-        }
+        option->flags = RG_DIALOG_FLAG_DISABLED;
         snprintf(option->value, 32, "%s (theme)", gui.font->name);
         return RG_DIALOG_VOID;
     }
+    option->flags = RG_DIALOG_FLAG_NORMAL;
     if (event == RG_DIALOG_PREV && rg_gui_set_font(gui.font_index - 1))
         return RG_DIALOG_REDRAW;
     if (event == RG_DIALOG_NEXT && rg_gui_set_font(gui.font_index + 1))
