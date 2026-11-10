@@ -45,8 +45,10 @@
     {RG_KEY_DOWN,   .num = GPIO_NUM_42, .pullup = 1, .level = 0},\
     {RG_KEY_RIGHT,  .num = GPIO_NUM_41, .pullup = 1, .level = 0},\
     {RG_KEY_LEFT,   .num = GPIO_NUM_40, .pullup = 1, .level = 0},\
+    {RG_KEY_MENU,   .num = GPIO_NUM_13, .pullup = 1, .level = 0},\
 }
 
+// Start+Select also works as MENU, for consoles built without the Menu button (GPIO13)
 #define RG_GAMEPAD_VIRT_MAP {\
     {RG_KEY_MENU,   .src = RG_KEY_START | RG_KEY_SELECT},\
 }

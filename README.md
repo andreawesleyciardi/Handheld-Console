@@ -12,7 +12,7 @@ for anyone building a similar console:
 - 16 MB flash and 8 MB OPI PSRAM
 - DFRobot Fermion DFR0669 ILI9488 display, 480x320
 - External SPI micro-SD module
-- 12 GPIO buttons and a battery voltage divider
+- 12 GPIO buttons plus a Menu button, and a battery voltage divider
 
 ## Why this customization exists
 
@@ -104,8 +104,12 @@ the original prototype.
 
 ### Controls and battery
 
-The 12-button GPIO mapping and battery ADC configuration are also defined in
-[`config.h`](components/retro-go/targets/esp32-s3-handheld/config.h). The
+The button GPIO mapping and battery ADC configuration are also defined in
+[`config.h`](components/retro-go/targets/esp32-s3-handheld/config.h).
+
+The Menu button goes between **GPIO13** and GND (the internal pull-up is enabled, like for the other
+buttons). Pressing Start and Select together also works as Menu, so a console without the button is still
+usable. Don't use GPIO14 for a button: it's the battery reading. The
 current target has no dedicated audio hardware and uses the configured battery
 voltage divider for voltage and percentage reporting.
 
@@ -151,7 +155,7 @@ SIZE=320x240 tools/build_sdl2_macos.sh   # preview another screen size (build ag
 | L / R         | Q / W     |
 | Start         | Space     |
 | Select        | Backspace |
-| Menu          | Space + Backspace (Start + Select, as on the device) |
+| Menu          | Esc, or Space + Backspace (Start + Select) |
 
 The emulated SD card is `./sd`. Put ROMs in `./sd/roms/<system>/`. `./sd/retro-go/themes`
 links to this repository's `themes/` folder. The selected theme reloads by itself when one of its files
@@ -192,6 +196,10 @@ of the image's top left corner.
 - DOOM via `prboom-go`
 - Mega Drive / Genesis via `gwenesis`
 - MSX via `fmsx`
+
+In a game, a short press on Menu opens the game menu. Holding it for 2 seconds opens a quit menu
+instead: **Resume game**, **Save & Quit** (pick a save slot, then back to the launcher) or **Quit** (back
+to the launcher without saving, so the last save stays as it was). B also closes it.
 
 The game speed set in a game's menu (Speed, 0.5x to 2.5x) is remembered for that game: it starts at
 that speed next time. It's saved in `/retro-go/config/<game file name>.json`.

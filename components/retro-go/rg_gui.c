@@ -2783,9 +2783,46 @@ int rg_gui_savestate_menu(const char *title, const char *rom_path)
     return slot;
 }
 
+// Holding MENU opens a short menu to leave the game: save and quit, quit (keeping the last save as it
+// is), or go back to the game.
+void rg_gui_quit_menu(void)
+{
+    const char *rom_path = rg_system_get_app()->romPath;
+    const char *title = _("Quit game?");
+    const rg_gui_option_t choices[] = {
+        {1000, _("Resume game"), NULL, RG_DIALOG_FLAG_NORMAL, NULL},
+        {2000, _("Save & Quit"), NULL, RG_DIALOG_FLAG_NORMAL, NULL},
+        {7000, _("Quit"),        NULL, RG_DIALOG_FLAG_NORMAL, NULL},
+        RG_DIALOG_END
+    };
+    int slot;
+
+    rg_audio_set_mute(true);
+
+    // Shown while MENU is still held. The menu starts once it's released, otherwise MENU would close it.
+    rg_gui_draw_dialog(title, choices, RG_COUNT(choices) - 1, 0);
+    rg_input_wait_for_key(RG_KEY_ALL, false, -1);
+
+    switch (rg_gui_dialog(title, choices, 0))
+    {
+        case 2000: if ((slot = rg_gui_savestate_menu(_("Save"), rom_path)) >= 0 && rg_emu_save_state(slot)) rg_system_exit(); break;
+        case 7000: rg_system_exit(); break;
+    }
+
+    rg_audio_set_mute(false);
+}
+
 void rg_gui_game_menu(void)
 {
     const char *rom_path = rg_system_get_app()->romPath;
+
+    // Still held after RG_GUI_MENU_HOLD_MS: the quit menu instead of this one
+    if (rg_input_key_is_pressed(RG_KEY_MENU) && !rg_input_wait_for_key(RG_KEY_MENU, false, RG_GUI_MENU_HOLD_MS))
+    {
+        rg_gui_quit_menu();
+        return;
+    }
+
     bool have_option_btn = rg_input_key_is_present(RG_KEY_OPTION);
     const rg_gui_option_t choices[] = {
         {1000, _("Save & Continue"), NULL, RG_DIALOG_FLAG_NORMAL, NULL},

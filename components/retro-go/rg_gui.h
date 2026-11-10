@@ -149,6 +149,8 @@ int rg_gui_input_char(const rg_keyboard_layout_t *map);
 int rg_gui_savestate_menu(const char *title, const char *rom_path);
 void rg_gui_options_menu(void);
 void rg_gui_game_menu(void);
+void rg_gui_quit_menu(void);            // Resume / Save & Quit / Quit, opened by holding MENU in a game
+#define RG_GUI_MENU_HOLD_MS 2000        // How long MENU is held to open rg_gui_quit_menu instead of the game menu
 void rg_gui_about_menu(void);
 void rg_gui_debug_menu(void);
 

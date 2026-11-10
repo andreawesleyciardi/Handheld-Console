@@ -370,6 +370,7 @@ void snes_main(void)
 
     bool menuCancelled = false;
     bool menuPressed = false;
+    int64_t menuPressedSince = 0;
     int skipFrames = 0;
 
     while (1)
@@ -390,6 +391,16 @@ void snes_main(void)
         {
             rg_display_sync(true);
             rg_gui_options_menu();
+        }
+
+        // SNES opens the game menu when MENU is released, so holding it is checked here
+        if ((joystick & RG_KEY_MENU) && !menuPressed)
+            menuPressedSince = rg_system_timer();
+        if ((joystick & RG_KEY_MENU) && !menuCancelled && rg_system_timer() - menuPressedSince >= RG_GUI_MENU_HOLD_MS * 1000)
+        {
+            rg_display_sync(true);
+            rg_gui_quit_menu(); // Returns once MENU was released and the menu closed
+            joystick = 0;       // So the release doesn't also open the game menu
         }
 
         menuPressed = joystick & RG_KEY_MENU;

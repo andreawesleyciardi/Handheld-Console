@@ -30,8 +30,8 @@
 #define RG_SCREEN_SDL_SCALE         2   // Window is twice the screen size (960x640) so it is readable on a laptop
 #define RG_SCREEN_SDL_NATIVE_ORDER  1   // Read pixels like the device's ILI9488 driver does, so colors match the device
 
-// Input: the same 12 buttons as the device. There is no MENU/OPTION button: like on the
-// device, MENU is Start+Select (Space + Backspace).
+// Input: the same buttons as the device. MENU is Esc (the device's Menu button) or Start+Select
+// (Space + Backspace). Holding it for 2 seconds in a game opens the quit menu.
 #define RG_GAMEPAD_KBD_MAP {\
     {RG_KEY_UP,     SDL_SCANCODE_UP},\
     {RG_KEY_RIGHT,  SDL_SCANCODE_RIGHT},\
@@ -45,6 +45,7 @@
     {RG_KEY_Y,      SDL_SCANCODE_A},\
     {RG_KEY_L,      SDL_SCANCODE_Q},\
     {RG_KEY_R,      SDL_SCANCODE_W},\
+    {RG_KEY_MENU,   SDL_SCANCODE_ESCAPE},\
 }
 
 #define RG_GAMEPAD_VIRT_MAP {\
