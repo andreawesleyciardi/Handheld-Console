@@ -28,7 +28,7 @@
 #define RG_SCREEN_SAFE_AREA         {0, 0, 0, 0}
 #define RG_SCREEN_INIT()
 #define RG_SCREEN_SDL_SCALE         2   // Window is twice the screen size (960x640) so it is readable on a laptop
-#define RG_SCREEN_SDL_NATIVE_ORDER  1   // Read pixels like the device's ILI9488 driver does, so colors match the device
+#define RG_SCREEN_SDL_NATIVE_ORDER  0   // Big-endian pixels like every driver gets (the device's ILI9488 driver swaps them back too)
 
 // Input: the same buttons as the device. MENU is Esc (the device's Menu button) or Start+Select
 // (Space + Backspace). Holding it for 2 seconds in a game opens the quit menu.

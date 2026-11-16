@@ -197,7 +197,9 @@ static inline void lcd_send_buffer(uint16_t *buffer, size_t length)
         uint8_t *pixels = (uint8_t *)buffer;
         for (size_t index = length; index-- > 0;)
         {
-            uint16_t pixel = buffer[index];
+            // Retro-Go hands every driver big-endian RGB565 (the byte order SPI displays take as is), so swap
+            // back to a native value before converting to the ILI9488's 18-bit RGB666
+            uint16_t pixel = __builtin_bswap16(buffer[index]);
             pixels[index * 3 + 0] = ((((pixel >> 11) & 0x1F) << 1) | ((pixel >> 15) & 1)) << 2;
             pixels[index * 3 + 1] = ((pixel >> 5) & 0x3F) << 2;
             pixels[index * 3 + 2] = ((((pixel & 0x1F) << 1) | ((pixel >> 4) & 1)) << 2);
