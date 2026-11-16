@@ -12,11 +12,12 @@
 # Other screen sizes (to test themes for other devices): SIZE=320x240 tools/build_sdl2_macos.sh
 # The size is built into the programs: build again without SIZE to go back to 480x320.
 #
-# The emulated SD card is ./sd (git-ignored). Put ROMs in ./sd/roms/<system>/.
+# The emulated SD card is ./sd (git-ignored), created on the first run with the files in ./sdcard
+# and empty test games from tools/sdl2-macos/test-roms. Put ROMs in ./sd/roms/<system>/.
 # ./sd/retro-go/themes is a symlink to ./themes, so theme edits in the repo show up immediately.
 #
 # Keys: arrows = D-pad, X = A, Z = B, S = X, A = Y, Q = L, W = R,
-#       Space = Start, Backspace = Select, Space+Backspace = Menu (same as the device).
+#       Space = Start, Backspace = Select, Esc or Space+Backspace = Menu (same as the device).
 #
 # Only the launcher and retro-core (NES, SNES, GB/GBC, PCE, SMS/GG, Lynx, G&W, Coleco) run on desktop.
 
@@ -75,6 +76,10 @@ prepare_sd() {
     if [ ! -e sd/retro-go/themes ]; then
         ln -s ../../themes sd/retro-go/themes
     fi
+    # The SD card's starting files (splash image) and empty test games for the game list.
+    # Existing files are kept, so a splash or game you replaced in ./sd isn't overwritten.
+    rsync -r --ignore-existing sdcard/ sd/
+    rsync -r --ignore-existing tools/sdl2-macos/test-roms/ sd/roms/
 }
 
 # On the device, switching app saves the next app in boot.json and reboots into another flash

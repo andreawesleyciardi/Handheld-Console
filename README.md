@@ -169,7 +169,10 @@ SIZE=320x240 tools/build_sdl2_macos.sh   # preview another screen size (build ag
 | Select        | Backspace                                  |
 | Menu          | Esc, or Space + Backspace (Start + Select) |
 
-The emulated SD card is `./sd`. Put ROMs in `./sd/roms/<system>/`. `./sd/retro-go/themes`
+The emulated SD card is `./sd` (not in git). The first run creates it with the files in
+[`sdcard/`](sdcard/) (the splash image) and empty test games in `./sd/roms/nes/`, from
+[`tools/sdl2-macos/test-roms`](tools/sdl2-macos/test-roms/), to fill the game list (they don't start).
+Files already in `./sd` are never overwritten. Put ROMs in `./sd/roms/<system>/`. `./sd/retro-go/themes`
 links to this repository's `themes/` folder. The selected theme reloads by itself when one of its files
 is saved, and Cmd+R (or F5) reloads it on demand (these developer keys are only in this desktop build). Logs
 are written to `stdout.txt`. Setting `RG_SDL_SNAPSHOT=/path/file.bmp` saves the emulated
@@ -195,6 +198,9 @@ from the Recalbox theme by Nils Bonenberger and the Recalbox community) are exam
 the SD card to install them.
 
 ## Splash image
+
+This handheld's splash image is [`sdcard/retro-go/splash.png`](sdcard/retro-go/splash.png): copy the
+contents of [`sdcard/`](sdcard/) to the root of the SD card to install it.
 
 At power on and while a game loads, Retro-Go shows `/retro-go/splash.png` from the SD card, or a built-in
 "RETRO-GO" image if there's none. Use any PNG: the best size is the screen's (480x320 on this handheld).
