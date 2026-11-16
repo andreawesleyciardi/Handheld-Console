@@ -2104,7 +2104,8 @@ static rg_gui_event_t font_type_cb(rg_gui_option_t *option, rg_gui_event_t event
 // description and author from theme.json at the bottom.
 static void draw_theme_preview(const char *name)
 {
-    char theme_path[RG_PATH_MAX], path[RG_PATH_MAX], info[160] = "";
+    // path holds theme_path plus a file name, so it must be larger than theme_path
+    char theme_path[RG_PATH_MAX], path[RG_PATH_MAX + 32], info[160] = "";
     rg_image_t *preview = NULL;
 
     if (name && name[0])

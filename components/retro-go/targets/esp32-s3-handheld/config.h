@@ -3,7 +3,7 @@
 
 #define RG_STORAGE_ROOT            "/sd"
 #define RG_STORAGE_SDSPI_HOST      SPI3_HOST
-#define RG_STORAGE_SDSPI_SPEED     1000
+#define RG_STORAGE_SDSPI_SPEED     SDMMC_FREQ_DEFAULT // 20 MHz. Was 1000 (1 MHz): too slow for theme images
 #define RG_STORAGE_SDSPI_SDFAT     1
 
 // No audio hardware is installed.
@@ -45,10 +45,15 @@
     {RG_KEY_DOWN,   .num = GPIO_NUM_42, .pullup = 1, .level = 0},\
     {RG_KEY_RIGHT,  .num = GPIO_NUM_41, .pullup = 1, .level = 0},\
     {RG_KEY_LEFT,   .num = GPIO_NUM_40, .pullup = 1, .level = 0},\
-    {RG_KEY_MENU,   .num = GPIO_NUM_13, .pullup = 1, .level = 0},\
+    {RG_KEY_MENU,   .num = GPIO_NUM_0,  .pullup = 1, .level = 0},\
 }
 
-// Start+Select also works as MENU, for consoles built without the Menu button (GPIO13)
+// Menu is GPIO0, the board's BOOT button pin: the Menu button goes in parallel with it (GPIO0 to GND).
+// Holding Menu at power on starts the ESP32 in download mode instead of Retro-Go (harmless).
+// Start+Select also works as MENU.
+// Not usable for Menu: GPIO13 drives the LED stick, GPIO39 is the joystick's center press (too easy to
+// press by accident), and GPIO38 reads low even with nothing connected on this board, so Retro-Go saw
+// Menu held at boot and went into recovery mode.
 #define RG_GAMEPAD_VIRT_MAP {\
     {RG_KEY_MENU,   .src = RG_KEY_START | RG_KEY_SELECT},\
 }

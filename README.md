@@ -14,6 +14,11 @@ for anyone building a similar console:
 - External SPI micro-SD module
 - 12 GPIO buttons plus a Menu button, and a battery voltage divider
 
+For a compact technical brief intended for AI coding assistants, see
+[`AI_CONTEXT.md`](AI_CONTEXT.md). It records the target invariants, exact
+macOS build and flash commands, application layout, SD-card runtime model, and
+common troubleshooting constraints.
+
 ## Why this customization exists
 
 The upstream Retro-Go project supports many devices, but this board and display
@@ -98,7 +103,9 @@ Power the LCD from 3.3 V.
 | MISO / DO |         GPIO8 |
 | CS        |        GPIO16 |
 
-The current build uses the external SD module at `/sd`. Verify the module's
+The current build uses the external SD module at `/sd`, at 20 MHz (it was 1 MHz at first, which made
+theme images take seconds to load). If the card stops mounting with long or loose wires, lower
+`RG_STORAGE_SDSPI_SPEED` in `config.h` (for example to `10000`, in kHz). Verify the module's
 logic-level and power requirements before reproducing the 5 V supply used in
 the original prototype.
 
@@ -107,9 +114,14 @@ the original prototype.
 The button GPIO mapping and battery ADC configuration are also defined in
 [`config.h`](components/retro-go/targets/esp32-s3-handheld/config.h).
 
-The Menu button goes between **GPIO13** and GND (the internal pull-up is enabled, like for the other
-buttons). Pressing Start and Select together also works as Menu, so a console without the button is still
-usable. Don't use GPIO14 for a button: it's the battery reading. The
+The Menu button goes between **GPIO0** and GND, in parallel with the board's BOOT button (which also
+works as Menu). Holding Menu while powering on starts the board in download mode instead of Retro-Go:
+release it and power on again. Pressing Start and Select together also works as Menu.
+
+Pins that can't be used for buttons: GPIO14 is the battery reading, GPIO13 drives the LED stick, GPIO39 is
+the joystick's center press (not mapped, it's too easy to press by accident), and GPIO38 reads low on this
+board even with nothing connected (a button there makes Retro-Go see Menu held at boot and loop into
+recovery mode). The
 current target has no dedicated audio hardware and uses the configured battery
 voltage divider for voltage and percentage reporting.
 
@@ -147,14 +159,14 @@ tools/build_sdl2_macos.sh run        # run without rebuilding
 SIZE=320x240 tools/build_sdl2_macos.sh   # preview another screen size (build again without SIZE for 480x320)
 ```
 
-| Device button | Key       |
-| ------------- | --------- |
-| D-pad         | Arrows    |
-| A / B         | X / Z     |
-| X / Y         | S / A     |
-| L / R         | Q / W     |
-| Start         | Space     |
-| Select        | Backspace |
+| Device button | Key                                        |
+| ------------- | ------------------------------------------ |
+| D-pad         | Arrows                                     |
+| A / B         | X / Z                                      |
+| X / Y         | S / A                                      |
+| L / R         | Q / W                                      |
+| Start         | Space                                      |
+| Select        | Backspace                                  |
 | Menu          | Esc, or Space + Backspace (Start + Select) |
 
 The emulated SD card is `./sd`. Put ROMs in `./sd/roms/<system>/`. `./sd/retro-go/themes`

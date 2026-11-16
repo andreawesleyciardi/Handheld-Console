@@ -17,7 +17,7 @@
 #define MAX_REGISTERED      16
 #define MAX_CACHED_IMAGES   64
 #define MAX_CACHED_FONTS    8
-#define IMAGE_CACHE_BUDGET  (2 * 1024 * 1024) // Bytes of decoded images kept; least recently used go first
+#define IMAGE_CACHE_BUDGET  (5 * 1024 * 1024) // Bytes of decoded images kept; least recently used go first. Enough for every tab's 480x320 background, so revisiting a tab doesn't reload it from the SD card
 #define IMAGE_CACHE_BUDGET_INGAME (256 * 1024) // In games, where emulators need the memory (only menus are themed)
 
 static struct
@@ -82,6 +82,13 @@ static void script_watchdog(lua_State *L, lua_Debug *ar)
         luaL_error(L, "script took too long (infinite loop?)");
 }
 
+// The time limit is there to catch runaway scripts, not slow storage: on the device, reading a
+// full-screen PNG from the SD card can take seconds, which would otherwise disable the theme.
+static void exclude_from_time_limit(int64_t since)
+{
+    script.call_deadline += rg_system_timer() - since;
+}
+
 static int check_int(lua_State *L, int idx)
 {
     return (int)luaL_checknumber(L, idx);
@@ -143,7 +150,9 @@ static rg_image_t *get_cached_image(lua_State *L, const char *name)
 
     char path[RG_PATH_MAX];
     rg_gui_theme_file_path(script.theme_path, name, path, sizeof(path));
+    int64_t load_start = rg_system_timer();
     rg_image_t *img = rg_surface_load_image_file(path, 0);
+    exclude_from_time_limit(load_start);
     if (!img)
         RG_LOGW("Theme image not found: '%s'", path);
     size_t bytes = img ? (size_t)img->width * img->height * (img->alpha ? 3 : 2) : 0;
@@ -201,7 +210,9 @@ static const rg_font_t *get_cached_font(lua_State *L, const char *name)
             char path[RG_PATH_MAX];
             rg_gui_theme_file_path(script.theme_path, name, path, sizeof(path));
             snprintf(script.fonts[i].name, sizeof(script.fonts[i].name), "%s", name);
+            int64_t load_start = rg_system_timer();
             script.fonts[i].font = rg_gui_load_font_file(path);
+            exclude_from_time_limit(load_start);
             if (!script.fonts[i].font)
                 RG_LOGW("Theme font not found or invalid: '%s'", path);
             return script.fonts[i].font;
